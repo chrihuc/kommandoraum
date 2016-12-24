@@ -46,7 +46,7 @@ public class MainActivity extends Activity {
     private static final String PROPERTY_APP_VERSION = "appVersion";
     TextView mDisplay;
 
-    String SENDER_ID = "192696193588";
+    String SENDER_ID = "568669847245";
     GoogleCloudMessaging gcm;
 
     public Boolean server_online = true;
@@ -218,6 +218,7 @@ public class MainActivity extends Activity {
         String msg = "{'GCM-Client':'";
         String ende = "'}";
         send_to_server(msg + android_id + ende);
+        send_to_server(msg + regid + ende);
     }
 
     public void send_to_server(String Befehl){

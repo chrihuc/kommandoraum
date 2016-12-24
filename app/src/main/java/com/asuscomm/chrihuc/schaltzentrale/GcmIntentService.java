@@ -99,7 +99,7 @@ public class GcmIntentService extends IntentService {
         PendingIntent contentIntent = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class), PendingIntent.FLAG_CANCEL_CURRENT);
         NotificationCompat.Builder mBuilder =
                 new NotificationCompat.Builder(this)
-                        //.setSmallIcon(R.drawable.ic_stat_gcm)
+                        .setSmallIcon(R.drawable.ic_stat_gcm)
                         .setContentTitle(titel)
                         .setStyle(new NotificationCompat.BigTextStyle()
                                 .bigText(msg))
