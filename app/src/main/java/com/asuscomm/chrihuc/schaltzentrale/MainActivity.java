@@ -3,17 +3,23 @@ import com.asuscomm.chrihuc.schaltzentrale.SocketClient;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
+import android.preference.PreferenceManager;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.AsyncTask;
 import android.os.StrictMode;
+import android.preference.PreferenceManager;
 import android.provider.Settings;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
+import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.widget.TextView;
 
 import com.google.android.gms.common.ConnectionResult;
@@ -35,7 +41,7 @@ import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class MainActivity extends Activity {
+public class MainActivity extends AppCompatActivity {
 
     public static final String EXTRA_MESSAGE = "message";
     public static final String PROPERTY_REG_ID = "registration_id";
@@ -60,6 +66,8 @@ public class MainActivity extends Activity {
         StrictMode.setThreadPolicy(policy);
         super.onCreate(savedInstanceState);
 
+        //setHasOptionsMenu(true);
+
         ConnectivityManager connManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
 		NetworkInfo mWifi = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
         context = getApplicationContext();
@@ -67,7 +75,7 @@ public class MainActivity extends Activity {
         //INSERT ping or IP check to see what is online
 
         //Google play services for receiving messages
-        //Attention needs MySQL Server
+
         Activity act = this;
         int resultCode = GooglePlayServicesUtil.isGooglePlayServicesAvailable(this);
         if (checkPlayServices(act) && server_online) {
@@ -79,6 +87,26 @@ public class MainActivity extends Activity {
 
             setContentView(R.layout.activity_main);
     }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        // Inflate the menu; this adds items to the action bar if it is present.
+        getMenuInflater().inflate(R.menu.main, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        // Handle item selection
+        int id = item.getItemId();
+
+        if (id == R.id.settings) {
+            startActivity(new Intent(this, EinstellungenActivity.class));
+            return true;
+        }
+        return true;
+    }
+
 
     public boolean checkPlayServices(Activity act) {
         int resultCode = GooglePlayServicesUtil.isGooglePlayServicesAvailable(act);
@@ -215,10 +243,23 @@ public class MainActivity extends Activity {
     public void sendRegistrationIdToBackend(String regid) {
         String android_id = Settings.Secure.getString(getBaseContext().getContentResolver(),
                 Settings.Secure.ANDROID_ID);
+
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+        String User_name = prefs.getString("User_name", "");
+        if (User_name.equals("")){
+            startActivity(new Intent(this, EinstellungenActivity.class));
+            prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+            User_name = prefs.getString("@string/preference_name_key", "");
+        }
+
         String msg = "{'GCM-Client':'";
         String ende = "'}";
-        send_to_server(msg + android_id + ende);
-        send_to_server(msg + regid + ende);
+        //send_to_server(msg + android_id + ende);
+        msg = "{'Android_id':'" + android_id;
+        msg = msg + "', 'Name':'" + User_name;
+        msg = msg + "', 'Reg_id':'" + regid;
+        ende = "'}";
+        send_to_server(msg + ende);
     }
 
     public void send_to_server(String Befehl){

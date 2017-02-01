@@ -12,9 +12,11 @@ package com.asuscomm.chrihuc.schaltzentrale;
         import android.app.PendingIntent;
         import android.content.Context;
         import android.content.Intent;
+        import android.content.SharedPreferences;
         import android.os.Bundle;
         import android.os.PowerManager;
         import android.os.SystemClock;
+        import android.preference.PreferenceManager;
         import android.support.v4.app.NotificationCompat;
         import android.util.Log;
 
@@ -49,6 +51,7 @@ public class GcmIntentService extends IntentService {
         // The getMessageType() intent parameter must be the intent you received
         // in your BroadcastReceiver.
         String messageType = gcm.getMessageType(intent);
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
 
         if (!extras.isEmpty()) {  // has effect of unparcelling Bundle
             /*
@@ -74,12 +77,17 @@ public class GcmIntentService extends IntentService {
                 Log.i(TAG, "Completed work @ " + SystemClock.elapsedRealtime());
                 // Post notification of received message.
                 if (titel.equals("Setting")){
-                    if ( TaskerIntent.testStatus( this ).equals( TaskerIntent.Status.OK ) ) {
-                        TaskerIntent i = new TaskerIntent( message );
-                        sendBroadcast( i );
-                    }
+                    Boolean rec_tasks = prefs.getBoolean("checkbox_pref_task", true);
+                    if (rec_tasks) {
+                        if ( TaskerIntent.testStatus( this ).equals( TaskerIntent.Status.OK ) ) {
+                            TaskerIntent i = new TaskerIntent( message );
+                            sendBroadcast( i );
+                        }}
                 }else{
-                    sendNotification(titel, message);
+                    Boolean rec_mes = prefs.getBoolean("checkbox_pref_mes", true);
+                    if (rec_mes) {
+                        sendNotification(titel, message);
+                    }
                 }
                 Log.i(TAG, "Received: " + extras.toString());
             }

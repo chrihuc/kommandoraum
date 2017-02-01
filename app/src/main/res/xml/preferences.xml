@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <EditTextPreference
+        android:title="@string/preference_name_title"
+        android:key="@string/preference_name_key"
+        android:defaultValue="@string/preference_name_default"
+        android:inputType="textMultiLine" />
+
+    <CheckBoxPreference
+        android:key="checkbox_pref_mes"
+        android:title="@string/preference_rec_mes_title"
+        android:summary="@string/preference_rec_mes_summ"
+        android:defaultValue="true" />
+
+    <CheckBoxPreference
+        android:key="checkbox_pref_task"
+        android:title="@string/preference_rec_tasks_title"
+        android:summary="@string/preference_rec_tasks_sum"
+        android:defaultValue="true" />
+
+</PreferenceScreen>

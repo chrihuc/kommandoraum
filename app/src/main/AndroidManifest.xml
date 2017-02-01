@@ -27,7 +27,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
+        <activity
+            android:name=".EinstellungenActivity"
+            android:label="@string/title_activity_einstellungen"
+            android:parentActivityName=".MainActivity">
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="com.asuscomm.chrihuc.schaltzentrale.MainActivity" />
+        </activity>
         <!--
           WakefulBroadcastReceiver that will receive intents from GCM
           services and hand them to the custom IntentService.

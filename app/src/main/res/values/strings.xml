@@ -1,3 +1,15 @@
 <resources>
     <string name="app_name">Schaltzentrale</string>
+    <string name="title_activity_einstellungen">Einstellungen</string>
+
+    <string name="preference_name_default"></string>
+    <string name="preference_name_title">Benutzer Name</string>
+    <string name="preference_name_key">User_name</string>
+
+    <string name="preference_rec_mes_title">Empfange Nachrichten</string>
+    <string name="preference_rec_mes_summ">Zeigt Nachrichten vom Haus</string>
+    <string name="preference_rec_tasks_title">Empfange Tasks</string>
+    <string name="preference_rec_tasks_sum">Empfängt und führt Actionen aus</string>
+
+
 </resources>
