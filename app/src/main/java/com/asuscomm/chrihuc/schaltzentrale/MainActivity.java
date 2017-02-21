@@ -21,6 +21,7 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
@@ -102,6 +103,10 @@ public class MainActivity extends AppCompatActivity {
 
         if (id == R.id.settings) {
             startActivity(new Intent(this, EinstellungenActivity.class));
+            return true;
+        }
+        if (id == R.id.wecker) {
+            req_from_server("Settings");
             return true;
         }
         return true;
@@ -259,12 +264,25 @@ public class MainActivity extends AppCompatActivity {
         msg = msg + "', 'Name':'" + User_name;
         msg = msg + "', 'Reg_id':'" + regid;
         ende = "'}";
+        //Toast.makeText(this, "Register with Server.", Toast.LENGTH_SHORT).show();
         send_to_server(msg + ende);
     }
 
     public void send_to_server(String Befehl){
         try {
-            SocketClient.main(Befehl);
+            SocketClient.broadc(Befehl);
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+    }
+
+    public void req_from_server(String Befehl){
+        try {
+            String msg = "{'GCM-Client':'";
+            msg = "{'Request':'" + Befehl;
+            msg = msg +  "'}";
+            SocketClient.request(msg);
         } catch (IOException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
