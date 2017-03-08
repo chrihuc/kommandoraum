@@ -2,8 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.asuscomm.chrihuc.schaltzentrale" >
     <uses-sdk
-        android:minSdkVersion="16"
-        android:targetSdkVersion="16" />
+        android:minSdkVersion="23"
+        android:targetSdkVersion="23" />
     <uses-permission android:name="android.permission.INTERNET"/>
     <permission android:name="com.asuscomm.chrihuc.schaltzentrale.permission.C2D_MESSAGE" android:protectionLevel="signature"/>
     <uses-permission android:name="net.dinglisch.android.tasker.PERMISSION_RUN_TASKS"/>

@@ -26,7 +26,8 @@ public class SocketClient  {
         socket.close();
     }
 
-    public static void request(String args) throws IOException {
+
+    public static String request(String args) throws IOException {
         //DatagramSocket socket = new DatagramSocket();
 
         //byte[] buf = new byte[1024];
@@ -63,7 +64,7 @@ public class SocketClient  {
         System.out.println(output);
         dis2.close();
         s.close();
-
+        return line;
     }
 }
 

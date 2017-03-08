@@ -36,6 +36,7 @@ import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.message.BasicNameValuePair;
+import org.json.JSONException;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -106,10 +107,21 @@ public class MainActivity extends AppCompatActivity {
             return true;
         }
         if (id == R.id.wecker) {
-            req_from_server("Settings");
+            showWecker();
             return true;
         }
         return true;
+    }
+
+    public void showWecker() {
+        setContentView(R.layout.wecker);
+        String setWeckers = req_from_server("Wecker");
+        try {
+            WeckerView wV = new WeckerView(this);
+            wV.schlafen_show(setWeckers);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
     }
 
 
@@ -277,16 +289,18 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public void req_from_server(String Befehl){
+    public String req_from_server(String Befehl){
         try {
             String msg = "{'GCM-Client':'";
             msg = "{'Request':'" + Befehl;
             msg = msg +  "'}";
-            SocketClient.request(msg);
+            String antwort = SocketClient.request(msg);
+            return antwort;
         } catch (IOException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
+        return "";
     }
 
 }
