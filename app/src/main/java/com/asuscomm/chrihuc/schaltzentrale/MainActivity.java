@@ -20,6 +20,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -86,8 +87,7 @@ public class MainActivity extends AppCompatActivity {
             if (regid.isEmpty()) {registerInBackground();} else{sendRegistrationIdToBackend(regid);}
         } else { Log.i(TAG, "No valid Google Play Services APK found.");}
 
-
-            setContentView(R.layout.activity_main);
+        showMain();
     }
 
     @Override
@@ -124,6 +124,12 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    public void showMain() {
+        req_from_server("Settings");
+        setContentView(R.layout.activity_main);
+        EditText testtext = (EditText) findViewById(R.id.editText);
+        testtext.setText("test");
+    }
 
     public boolean checkPlayServices(Activity act) {
         int resultCode = GooglePlayServicesUtil.isGooglePlayServicesAvailable(act);
@@ -292,7 +298,7 @@ public class MainActivity extends AppCompatActivity {
     public String req_from_server(String Befehl){
         try {
             String msg = "{'GCM-Client':'";
-            msg = "{'Request':'" + Befehl;
+            msg = "{'Request_js':'" + Befehl;
             msg = msg +  "'}";
             String antwort = SocketClient.request(msg);
             return antwort;
