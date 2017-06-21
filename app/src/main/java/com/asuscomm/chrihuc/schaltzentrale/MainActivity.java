@@ -20,7 +20,10 @@ import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
+import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -37,7 +40,9 @@ import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.message.BasicNameValuePair;
+import org.json.JSONArray;
 import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -60,6 +65,12 @@ public class MainActivity extends AppCompatActivity {
 
     public Boolean server_online = true;
 
+
+    @Override
+    public void onBackPressed()
+    {
+        showMain();
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -125,10 +136,27 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void showMain() {
-        req_from_server("Settings");
+        String sets = req_from_server("Settings");
         setContentView(R.layout.activity_main);
-        EditText testtext = (EditText) findViewById(R.id.editText);
-        testtext.setText("test");
+        TextView V00WOH1RUM1TE02 = (TextView) findViewById(R.id.V00WOH1RUM1TE02);
+        TextView A00TER1GEN1TE01 = (TextView) findViewById(R.id.A00TER1GEN1TE01);
+        try {
+            JSONObject jObj = new JSONObject(sets);
+            String WohziT = jObj.optString("V00WOH1RUM1TE02").toString();
+            V00WOH1RUM1TE02.setText(WohziT);
+            A00TER1GEN1TE01.setText(jObj.optString("A00TER1GEN1TE01").toString());
+        } catch (JSONException e) {
+            e.printStackTrace();
+            V00WOH1RUM1TE02.setText("Fehler");
+            A00TER1GEN1TE01.setText("Fehler");
+        }
+        final Button button4 = (Button) findViewById(R.id.button);
+        button4.setText("TV");
+        button4.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                send_to_server("{'Szene':'TV'}");
+            }
+        });
     }
 
     public boolean checkPlayServices(Activity act) {

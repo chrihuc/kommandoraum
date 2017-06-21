@@ -51,8 +51,11 @@ public class SocketClient  {
 
         Socket s = new Socket("192.168.192.10", 5005);
         DataOutputStream dos = new DataOutputStream(s.getOutputStream());
-        //dos.writeUTF(args);
-        dos.writeBytes(args);
+
+        dos.writeUTF(args);
+        dos.flush();
+        //dos.writeChars(args);
+        //dos.writeBytes(args);
 
 
         //read input stream

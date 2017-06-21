@@ -39,10 +39,10 @@ public class WeckerView {
             x1 = 600;
             y1 = 100;
         } else {
-            x1 = 500;
-            x2 = 110;
-            y1 = 100;
-            y2 = 80;
+            x1 = 1000;
+            x2 = 210;
+            y1 = 200;
+            y2 = 160;
         }
         final WeckerListe[] liste = new WeckerListe[11];
         String result = null;
@@ -122,7 +122,7 @@ public class WeckerView {
             tt.setText("Zeit");
             params = new RelativeLayout.LayoutParams(x1, RelativeLayout.LayoutParams.WRAP_CONTENT);
             params.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM, RelativeLayout.CENTER_HORIZONTAL);
-            params.topMargin = 200;
+            params.topMargin = 400;
             tt.setLayoutParams(params);
             //row.addView(tt);
             TimePicker startTime = new TimePicker(this.activity);
