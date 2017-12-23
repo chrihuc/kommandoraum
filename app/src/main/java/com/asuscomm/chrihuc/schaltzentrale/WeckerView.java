@@ -156,7 +156,7 @@ public class WeckerView {
                         int Min = startTimer.getMinute();
                         int Sec = Hour * 3600 + Min * 60;
                         int Id = 1;
-                        String Uhrzeit = String.valueOf(Hour) + String.valueOf(Min) + "00";
+                        String Uhrzeit = String.valueOf(Hour) + ":" + String.valueOf(Min) + ":" + "00";
                         json.put("Name", nm.toString());
                         json.put("Eingeschaltet", bool_to_string(liste[1].Wert));
                         json.put("Mo", bool_to_string(liste[2].Wert));

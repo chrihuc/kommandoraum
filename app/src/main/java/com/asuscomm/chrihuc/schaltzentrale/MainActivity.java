@@ -24,6 +24,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -140,23 +141,71 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         TextView V00WOH1RUM1TE02 = (TextView) findViewById(R.id.V00WOH1RUM1TE02);
         TextView A00TER1GEN1TE01 = (TextView) findViewById(R.id.A00TER1GEN1TE01);
+        TextView V00WOH1RUM1CO01 = (TextView) findViewById(R.id.V00WOH1RUM1CO01);
         try {
             JSONObject jObj = new JSONObject(sets);
-            String WohziT = jObj.optString("V00WOH1RUM1TE02").toString();
+            String WohziT = jObj.optString("V00WOH1RUM1TE01").toString();
             V00WOH1RUM1TE02.setText(WohziT);
             A00TER1GEN1TE01.setText(jObj.optString("A00TER1GEN1TE01").toString());
+            V00WOH1RUM1CO01.setText(jObj.optString("V00WOH1RUM1CO01").toString());
         } catch (JSONException e) {
             e.printStackTrace();
             V00WOH1RUM1TE02.setText("Fehler");
             A00TER1GEN1TE01.setText("Fehler");
+            V00WOH1RUM1CO01.setText("Fehler");
         }
-        final Button button4 = (Button) findViewById(R.id.button);
-        button4.setText("TV");
-        button4.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                send_to_server("{'Szene':'TV'}");
-            }
-        });
+
+        final ButtonFeatures[] ActBlist = new ButtonFeatures[3];
+        ActBlist[0] = new ButtonFeatures("Szene", "TV", "TV", 50, 220);
+        ActBlist[1] = new ButtonFeatures("Szene", "SonosEG", "Sonos", 250, 220);
+        ActBlist[2] = new ButtonFeatures("Szene", "AVaus", "Aus", 450, 220);
+        for (int i = 0; i < 3; i++) {
+
+            Button bu = new Button(this);
+            RelativeLayout.LayoutParams rl = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
+            rl.addRule(RelativeLayout.ALIGN_BOTTOM);
+            rl.leftMargin = ActBlist[i].x_value;
+            rl.topMargin = ActBlist[i].y_value;
+            rl.width = 210;
+            //rl.height = buttonH;
+            bu.setLayoutParams(rl);
+            bu.setText(ActBlist[i].Text);
+            final String name = ActBlist[i].Name;
+            final String command = ActBlist[i].Command;
+            bu.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    send_to_server("{'Szene':'" + command + "'}");
+                }
+            });
+            RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayout);
+            mrl.addView(bu);
+        }
+
+        final ButtonFeatures[] Blist = new ButtonFeatures[3];
+        Blist[0] = new ButtonFeatures("V00KUE1DEK1LI01", "Off", "Aus", 100, 1400);
+        Blist[1] = new ButtonFeatures("V00KUE1DEK1LI02", "Off", "Aus", 100, 1000);
+        Blist[2] = new ButtonFeatures("V00ESS1DEK1LI01", "Off", "Aus", 170, 750);
+        for (int i = 0; i < 3; i++) {
+
+            Button bu = new Button(this);
+            RelativeLayout.LayoutParams rl = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
+            rl.addRule(RelativeLayout.ALIGN_BOTTOM);
+            rl.leftMargin = Blist[i].x_value;
+            rl.topMargin = Blist[i].y_value;
+            rl.width = 180;
+            //rl.height = buttonH;
+            bu.setLayoutParams(rl);
+            bu.setText(Blist[i].Text);
+            final String name = Blist[i].Name;
+            final String command = Blist[i].Command;
+            bu.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    send_to_server("{'Device':'" + name + "', 'Command':'" + command + "'}");
+                }
+            });
+            RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayout);
+            mrl.addView(bu);
+        }
     }
 
     public boolean checkPlayServices(Activity act) {
