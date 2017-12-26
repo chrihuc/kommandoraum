@@ -24,6 +24,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.PopupMenu;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -154,7 +155,7 @@ public class MainActivity extends AppCompatActivity {
             A00TER1GEN1TE01.setText("Fehler");
             V00WOH1RUM1CO01.setText("Fehler");
         }
-
+/*
         final ButtonFeatures[] ActBlist = new ButtonFeatures[3];
         ActBlist[0] = new ButtonFeatures("Szene", "TV", "TV", 50, 220);
         ActBlist[1] = new ButtonFeatures("Szene", "SonosEG", "Sonos", 250, 220);
@@ -180,6 +181,40 @@ public class MainActivity extends AppCompatActivity {
             RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayout);
             mrl.addView(bu);
         }
+
+*/
+        final Button but = new Button(this);
+        RelativeLayout.LayoutParams rlt = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
+        rlt.addRule(RelativeLayout.ALIGN_BOTTOM);
+        rlt.leftMargin = 50;
+        rlt.topMargin = 300;
+        rlt.width = 210;
+        //rl.height = buttonH;
+        but.setLayoutParams(rlt);
+        but.setText("A/V");
+        but.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                PopupMenu popup = new PopupMenu(MainActivity.this, but);
+                //popup.getMenu().add(groupId, itemId, order, title);
+                popup.getMenu().add("TV");
+                popup.getMenu().add("SonosEG");
+                popup.getMenu().add("Radio");
+                popup.getMenu().add("AVaus");
+                popup.getMenu().add("EGLauter");
+                popup.getMenu().add("EGLeiser");
+                popup.getMenuInflater().inflate(R.menu.popup, popup.getMenu());
+                popup.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
+                    public boolean onMenuItemClick(MenuItem item) {
+                        send_to_server("{'Szene':'" + item.getTitle() + "'}");
+                        return true;
+                    }
+                });
+                popup.show();
+            }
+        });
+        RelativeLayout mrlt  = (RelativeLayout) findViewById(R.id.relLayout);
+        mrlt.addView(but);
+
 
         final ButtonFeatures[] Blist = new ButtonFeatures[3];
         Blist[0] = new ButtonFeatures("V00KUE1DEK1LI01", "Off", "Aus", 100, 1400);
