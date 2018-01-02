@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/dg" android:orderInCategory="100" android:title="Dachgeschoss"></item>
+    <item android:id="@+id/og" android:orderInCategory="100" android:title="Obergeschoss"></item>
+    <item android:id="@+id/ug" android:orderInCategory="100" android:title="Keller"></item>
     <item android:id="@+id/settings" android:orderInCategory="100" android:title="Settings"></item>
     <item android:id="@+id/wecker" android:orderInCategory="100" android:title="Wecker"></item>
 </menu>

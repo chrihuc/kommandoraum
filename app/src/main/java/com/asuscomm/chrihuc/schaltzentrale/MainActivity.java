@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Color;
 import android.preference.PreferenceManager;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -18,6 +19,7 @@ import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -75,6 +77,20 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if ((keyCode == KeyEvent.KEYCODE_VOLUME_DOWN)){
+            send_to_server("{'Szene':'EGLeiser'}");
+        }
+        if ((keyCode == KeyEvent.KEYCODE_VOLUME_UP)){
+            send_to_server("{'Szene':'EGLauter'}");
+        }
+        if ((keyCode == KeyEvent.KEYCODE_BACK)) {
+            showMain();
+        }
+        return true;
+    }
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         StrictMode.ThreadPolicy policy = new StrictMode.
                 ThreadPolicy.Builder().permitAll().build();
@@ -115,6 +131,18 @@ public class MainActivity extends AppCompatActivity {
         // Handle item selection
         int id = item.getItemId();
 
+        if (id == R.id.og) {
+            showOG();
+            return true;
+        }
+        if (id == R.id.dg) {
+            showDG();
+            return true;
+        }
+        if (id == R.id.ug) {
+            showUG();
+            return true;
+        }
         if (id == R.id.settings) {
             startActivity(new Intent(this, EinstellungenActivity.class));
             return true;
@@ -138,51 +166,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void showMain() {
-        String sets = req_from_server("Settings");
+        //String sets = req_from_server("Settings");
+        String inpts = req_from_server("Inputs_hks");
         setContentView(R.layout.activity_main);
-        TextView V00WOH1RUM1TE02 = (TextView) findViewById(R.id.V00WOH1RUM1TE02);
-        TextView A00TER1GEN1TE01 = (TextView) findViewById(R.id.A00TER1GEN1TE01);
-        TextView V00WOH1RUM1CO01 = (TextView) findViewById(R.id.V00WOH1RUM1CO01);
-        try {
-            JSONObject jObj = new JSONObject(sets);
-            String WohziT = jObj.optString("V00WOH1RUM1TE01").toString();
-            V00WOH1RUM1TE02.setText(WohziT);
-            A00TER1GEN1TE01.setText(jObj.optString("A00TER1GEN1TE01").toString());
-            V00WOH1RUM1CO01.setText(jObj.optString("V00WOH1RUM1CO01").toString());
-        } catch (JSONException e) {
-            e.printStackTrace();
-            V00WOH1RUM1TE02.setText("Fehler");
-            A00TER1GEN1TE01.setText("Fehler");
-            V00WOH1RUM1CO01.setText("Fehler");
-        }
-/*
-        final ButtonFeatures[] ActBlist = new ButtonFeatures[3];
-        ActBlist[0] = new ButtonFeatures("Szene", "TV", "TV", 50, 220);
-        ActBlist[1] = new ButtonFeatures("Szene", "SonosEG", "Sonos", 250, 220);
-        ActBlist[2] = new ButtonFeatures("Szene", "AVaus", "Aus", 450, 220);
-        for (int i = 0; i < 3; i++) {
 
-            Button bu = new Button(this);
-            RelativeLayout.LayoutParams rl = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
-            rl.addRule(RelativeLayout.ALIGN_BOTTOM);
-            rl.leftMargin = ActBlist[i].x_value;
-            rl.topMargin = ActBlist[i].y_value;
-            rl.width = 210;
-            //rl.height = buttonH;
-            bu.setLayoutParams(rl);
-            bu.setText(ActBlist[i].Text);
-            final String name = ActBlist[i].Name;
-            final String command = ActBlist[i].Command;
-            bu.setOnClickListener(new View.OnClickListener() {
-                public void onClick(View v) {
-                    send_to_server("{'Szene':'" + command + "'}");
-                }
-            });
-            RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayout);
-            mrl.addView(bu);
-        }
+        final ButtonFeatures[] inptList = new ButtonFeatures[4];
+        inptList[0] = new ButtonFeatures("V00WOH1RUM1TE01", "V00WOH1RUM1TE01", "V00WOH1RUM1TE01", 600, 450);
+        inptList[1] = new ButtonFeatures("V00WOH1RUM1CO01", "V00WOH1RUM1CO01", "V00WOH1RUM1CO01", 600, 500);
+        inptList[2] = new ButtonFeatures("A00TER1GEN1TE01", "A00TER1GEN1TE01", "A00TER1GEN1TE01", 420, 0);
+        inptList[3] = new ButtonFeatures("V00KUE1RUM1TE02", "V00KUE1RUM1TE02", "V00KUE1RUM1TE02", 300, 1200);
+        RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayout);
+        setInptLabels(inptList, mrl);
 
-*/
         final Button but = new Button(this);
         RelativeLayout.LayoutParams rlt = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
         rlt.addRule(RelativeLayout.ALIGN_BOTTOM);
@@ -238,10 +233,72 @@ public class MainActivity extends AppCompatActivity {
                     send_to_server("{'Device':'" + name + "', 'Command':'" + command + "'}");
                 }
             });
-            RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayout);
+            //RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayout);
             mrl.addView(bu);
         }
     }
+
+    public void setInptLabels(ButtonFeatures[] bfList, RelativeLayout mrl){
+        String werte = req_from_server("Inputs_hks");
+        try {
+            JSONObject jInpts = new JSONObject(werte);
+            for (int i = 0; i < bfList.length; i++) {
+                TextView tv = new TextView(this);
+                RelativeLayout.LayoutParams rl = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
+                rl.addRule(RelativeLayout.ALIGN_BOTTOM);
+                rl.leftMargin = bfList[i].x_value;
+                rl.topMargin = bfList[i].y_value;
+                //rl.width = 160;
+                //rl.height = buttonH;
+                tv.setLayoutParams(rl);
+                JSONObject jInpt = jInpts.getJSONObject(bfList[i].Name);
+                String valueread = jInpt.optString("last_Value").toString();
+                tv.setText(valueread);
+                tv.setBackgroundColor(Color.WHITE);
+                //RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayout);
+                mrl.addView(tv);
+            }
+
+        } catch (JSONException e) {
+
+        }
+    }
+
+    public void showOG() {
+        //String sets = req_from_server("Settings");
+        String inpts = req_from_server("Inputs_hks");
+        setContentView(R.layout.obergeschoss);
+
+        final ButtonFeatures[] inptList = new ButtonFeatures[3];
+        inptList[0] = new ButtonFeatures("V01BAD1RUM1TE01", "V01BAD1RUM1TE01", "V01BAD1RUM1TE01", 600, 1400);
+        inptList[1] = new ButtonFeatures("V01SCH1RUM1TE01", "V01SCH1RUM1TE01", "V01SCH1RUM1TE01", 200, 1200);
+        inptList[2] = new ButtonFeatures("V01KID1RUM1TE01", "V01KID1RUM1TE01", "V01KID1RUM1TE01", 700, 300);
+        RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayoutOG);
+        setInptLabels(inptList, mrl);
+    }
+
+    public void showDG() {
+        //String sets = req_from_server("Settings");
+        String inpts = req_from_server("Inputs_hks");
+        setContentView(R.layout.dachgeschoss);
+
+        final ButtonFeatures[] inptList = new ButtonFeatures[1];
+        inptList[0] = new ButtonFeatures("V02ZIM1RUM1TE02", "V02ZIM1RUM1TE02", "V02ZIM1RUM1TE02", 300, 1000);
+        RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayoutDG);
+        setInptLabels(inptList, mrl);
+    }
+
+    public void showUG() {
+        //String sets = req_from_server("Settings");
+        String inpts = req_from_server("Inputs_hks");
+        setContentView(R.layout.untergeschoss);
+
+        final ButtonFeatures[] inptList = new ButtonFeatures[1];
+        inptList[0] = new ButtonFeatures("Vm1ZIM1RUM1TE01", "Vm1ZIM1RUM1TE01", "Vm1ZIM1RUM1TE01", 600, 400);
+        RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayoutUG);
+        setInptLabels(inptList, mrl);
+    }
+
 
     public boolean checkPlayServices(Activity act) {
         int resultCode = GooglePlayServicesUtil.isGooglePlayServicesAvailable(act);
