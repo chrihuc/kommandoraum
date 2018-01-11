@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
+import android.graphics.Point;
 import android.preference.PreferenceManager;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -19,6 +20,7 @@ import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.Display;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -51,6 +53,7 @@ import org.json.JSONObject;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
@@ -68,6 +71,9 @@ public class MainActivity extends AppCompatActivity {
     GoogleCloudMessaging gcm;
 
     public Boolean server_online = true;
+    public int height = 1920;
+    public int width = 1080;
+    public int level = 0;
 
 
     @Override
@@ -85,7 +91,20 @@ public class MainActivity extends AppCompatActivity {
             send_to_server("{'Szene':'EGLauter'}");
         }
         if ((keyCode == KeyEvent.KEYCODE_BACK)) {
-            showMain();
+            switch(level) {
+                case 0:
+                    showMain();
+                    break;
+                case -1:
+                    showUG();
+                    break;
+                case 1:
+                    showOG();
+                    break;
+                case 2:
+                    showDG();
+                    break;
+            }
         }
         return true;
     }
@@ -116,6 +135,12 @@ public class MainActivity extends AppCompatActivity {
             if (regid.isEmpty()) {registerInBackground();} else{sendRegistrationIdToBackend(regid);}
         } else { Log.i(TAG, "No valid Google Play Services APK found.");}
 
+        Display display = getWindowManager().getDefaultDisplay();
+        Point size = new Point();
+        display.getSize(size);
+        height = size.y; //S7 1920 => /1920 * height /moto 888
+        width = size.x; //S7 1080 => /1080 * width /moto 540
+
         showMain();
     }
 
@@ -137,6 +162,10 @@ public class MainActivity extends AppCompatActivity {
         }
         if (id == R.id.dg) {
             showDG();
+            return true;
+        }
+        if (id == R.id.eg) {
+            showMain();
             return true;
         }
         if (id == R.id.ug) {
@@ -169,47 +198,22 @@ public class MainActivity extends AppCompatActivity {
         //String sets = req_from_server("Settings");
         String inpts = req_from_server("Inputs_hks");
         setContentView(R.layout.activity_main);
+        level = 0;
 
-        final ButtonFeatures[] inptList = new ButtonFeatures[4];
+        final ButtonFeatures[] inptList = new ButtonFeatures[5];
         inptList[0] = new ButtonFeatures("V00WOH1RUM1TE01", "V00WOH1RUM1TE01", "V00WOH1RUM1TE01", 600, 450);
         inptList[1] = new ButtonFeatures("V00WOH1RUM1CO01", "V00WOH1RUM1CO01", "V00WOH1RUM1CO01", 600, 500);
         inptList[2] = new ButtonFeatures("A00TER1GEN1TE01", "A00TER1GEN1TE01", "A00TER1GEN1TE01", 420, 0);
         inptList[3] = new ButtonFeatures("V00KUE1RUM1TE02", "V00KUE1RUM1TE02", "V00KUE1RUM1TE02", 300, 1200);
+        inptList[4] = new ButtonFeatures("V00KUE1RUM1ST01", "V00KUE1RUM1ST01", "V00KUE1RUM1ST01", 300, 1250);
         RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayout);
         setInptLabels(inptList, mrl);
 
-        final Button but = new Button(this);
-        RelativeLayout.LayoutParams rlt = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
-        rlt.addRule(RelativeLayout.ALIGN_BOTTOM);
-        rlt.leftMargin = 50;
-        rlt.topMargin = 300;
-        rlt.width = 210;
-        //rl.height = buttonH;
-        but.setLayoutParams(rlt);
-        but.setText("A/V");
-        but.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                PopupMenu popup = new PopupMenu(MainActivity.this, but);
-                //popup.getMenu().add(groupId, itemId, order, title);
-                popup.getMenu().add("TV");
-                popup.getMenu().add("SonosEG");
-                popup.getMenu().add("Radio");
-                popup.getMenu().add("AVaus");
-                popup.getMenu().add("EGLauter");
-                popup.getMenu().add("EGLeiser");
-                popup.getMenuInflater().inflate(R.menu.popup, popup.getMenu());
-                popup.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
-                    public boolean onMenuItemClick(MenuItem item) {
-                        send_to_server("{'Szene':'" + item.getTitle() + "'}");
-                        return true;
-                    }
-                });
-                popup.show();
-            }
-        });
-        RelativeLayout mrlt  = (RelativeLayout) findViewById(R.id.relLayout);
-        mrlt.addView(but);
 
+        final SzenenButton[] SzList = new SzenenButton[1];
+        SzList[0] = new SzenenButton("A/V", Arrays.asList("TV", "SonosEG", "Radio", "AVaus", "Kino", "KinoAus"), 50, 300);
+        RelativeLayout mrlt  = (RelativeLayout) findViewById(R.id.relLayout);
+        setSzenenButton(SzList, mrlt);
 
         final ButtonFeatures[] Blist = new ButtonFeatures[3];
         Blist[0] = new ButtonFeatures("V00KUE1DEK1LI01", "Off", "Aus", 100, 1400);
@@ -220,9 +224,9 @@ public class MainActivity extends AppCompatActivity {
             Button bu = new Button(this);
             RelativeLayout.LayoutParams rl = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
             rl.addRule(RelativeLayout.ALIGN_BOTTOM);
-            rl.leftMargin = Blist[i].x_value;
-            rl.topMargin = Blist[i].y_value;
-            rl.width = 180;
+            rl.leftMargin = (int) (Blist[i].x_value/1080.0 * width);
+            rl.topMargin = (int) (Blist[i].y_value/1920.0 * height);
+            rl.width = (int) (180.0/1080 * width);
             //rl.height = buttonH;
             bu.setLayoutParams(rl);
             bu.setText(Blist[i].Text);
@@ -238,6 +242,37 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    public void setSzenenButton(final SzenenButton[] SBList, RelativeLayout mrl){
+        for (int i = 0; i < SBList.length; i++) {
+            final int k = i;
+            final Button but = new Button(this);
+            RelativeLayout.LayoutParams rlt = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
+            rlt.addRule(RelativeLayout.ALIGN_BOTTOM);
+            rlt.leftMargin = (int) (SBList[i].x_value/1080.0 * width);
+            rlt.topMargin = (int) (SBList[i].y_value/1920.0 * height);
+            rlt.width = (int) (210.0/1080 * width);
+            but.setLayoutParams(rlt);
+            but.setText("A/V");
+            but.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    PopupMenu popup = new PopupMenu(MainActivity.this, but);
+                    for (int j = 0; j < SBList[k].Szenen.size(); j++) {
+                        popup.getMenu().add((String) (SBList[k].Szenen.get(j)));
+                    }
+                    popup.getMenuInflater().inflate(R.menu.popup, popup.getMenu());
+                    popup.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
+                        public boolean onMenuItemClick(MenuItem item) {
+                            send_to_server("{'Szene':'" + item.getTitle() + "'}");
+                            return true;
+                        }
+                    });
+                    popup.show();
+                }
+            });
+            mrl.addView(but);
+        }
+    }
+
     public void setInptLabels(ButtonFeatures[] bfList, RelativeLayout mrl){
         String werte = req_from_server("Inputs_hks");
         try {
@@ -246,8 +281,8 @@ public class MainActivity extends AppCompatActivity {
                 TextView tv = new TextView(this);
                 RelativeLayout.LayoutParams rl = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
                 rl.addRule(RelativeLayout.ALIGN_BOTTOM);
-                rl.leftMargin = bfList[i].x_value;
-                rl.topMargin = bfList[i].y_value;
+                rl.leftMargin = (int) (bfList[i].x_value/1080.0 * width);
+                rl.topMargin = (int) (bfList[i].y_value/1920.0 * height);
                 //rl.width = 160;
                 //rl.height = buttonH;
                 tv.setLayoutParams(rl);
@@ -268,6 +303,7 @@ public class MainActivity extends AppCompatActivity {
         //String sets = req_from_server("Settings");
         String inpts = req_from_server("Inputs_hks");
         setContentView(R.layout.obergeschoss);
+        level = 1;
 
         final ButtonFeatures[] inptList = new ButtonFeatures[3];
         inptList[0] = new ButtonFeatures("V01BAD1RUM1TE01", "V01BAD1RUM1TE01", "V01BAD1RUM1TE01", 600, 1400);
@@ -281,6 +317,7 @@ public class MainActivity extends AppCompatActivity {
         //String sets = req_from_server("Settings");
         String inpts = req_from_server("Inputs_hks");
         setContentView(R.layout.dachgeschoss);
+        level = 2;
 
         final ButtonFeatures[] inptList = new ButtonFeatures[1];
         inptList[0] = new ButtonFeatures("V02ZIM1RUM1TE02", "V02ZIM1RUM1TE02", "V02ZIM1RUM1TE02", 300, 1000);
@@ -292,9 +329,11 @@ public class MainActivity extends AppCompatActivity {
         //String sets = req_from_server("Settings");
         String inpts = req_from_server("Inputs_hks");
         setContentView(R.layout.untergeschoss);
+        level = -1;
 
-        final ButtonFeatures[] inptList = new ButtonFeatures[1];
+        final ButtonFeatures[] inptList = new ButtonFeatures[2];
         inptList[0] = new ButtonFeatures("Vm1ZIM1RUM1TE01", "Vm1ZIM1RUM1TE01", "Vm1ZIM1RUM1TE01", 600, 400);
+        inptList[1] = new ButtonFeatures("Vm1ZIM1PFL1TE01", "Vm1ZIM1PFL1TE01", "Vm1ZIM1PFL1TE01", 300, 300);
         RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayoutUG);
         setInptLabels(inptList, mrl);
     }
