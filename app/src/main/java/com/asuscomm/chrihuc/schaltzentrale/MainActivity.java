@@ -196,7 +196,6 @@ public class MainActivity extends AppCompatActivity {
 
     public void showMain() {
         //String sets = req_from_server("Settings");
-        String inpts = req_from_server("Inputs_hks");
         setContentView(R.layout.activity_main);
         level = 0;
 
@@ -209,11 +208,19 @@ public class MainActivity extends AppCompatActivity {
         RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayout);
         setInptLabels(inptList, mrl);
 
+        final ButtonFeatures[] SettList = new ButtonFeatures[1];
+        SettList[0] = new ButtonFeatures("Status", "Status", "Status", 0, 0);
+        setSettLabels(SettList, mrl);
 
-        final SzenenButton[] SzList = new SzenenButton[1];
+
+        final SzenenButton[] SzList = new SzenenButton[2];
         SzList[0] = new SzenenButton("A/V", Arrays.asList("TV", "SonosEG", "Radio", "AVaus", "Kino", "KinoAus"), 50, 300);
-        RelativeLayout mrlt  = (RelativeLayout) findViewById(R.id.relLayout);
-        setSzenenButton(SzList, mrlt);
+        SzList[1] = new SzenenButton("Status", Arrays.asList("Wach", "SchlafenGehen", "SchlafenGehenLeise", "Schlafen", "Gehen", "Gegangen"), 50, 450);
+        setSzenenButton(SzList, mrl);
+
+        final DeviceButton[] DvList = new DeviceButton[1];
+        DvList[0] = new DeviceButton("Temp", "V00WOH1RUM1ST01", Arrays.asList("17", "Aus", "20.0", "20.5", "21.0", "21.5", "22.0", "22.5", "23.0"), 300, 300);
+        setDeviceButton(DvList, mrl);
 
         final ButtonFeatures[] Blist = new ButtonFeatures[3];
         Blist[0] = new ButtonFeatures("V00KUE1DEK1LI01", "Off", "Aus", 100, 1400);
@@ -250,9 +257,9 @@ public class MainActivity extends AppCompatActivity {
             rlt.addRule(RelativeLayout.ALIGN_BOTTOM);
             rlt.leftMargin = (int) (SBList[i].x_value/1080.0 * width);
             rlt.topMargin = (int) (SBList[i].y_value/1920.0 * height);
-            rlt.width = (int) (210.0/1080 * width);
+            rlt.width = (int) (240.0/1080 * width);
             but.setLayoutParams(rlt);
-            but.setText("A/V");
+            but.setText(SBList[i].Name);
             but.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View v) {
                     PopupMenu popup = new PopupMenu(MainActivity.this, but);
@@ -263,6 +270,37 @@ public class MainActivity extends AppCompatActivity {
                     popup.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
                         public boolean onMenuItemClick(MenuItem item) {
                             send_to_server("{'Szene':'" + item.getTitle() + "'}");
+                            return true;
+                        }
+                    });
+                    popup.show();
+                }
+            });
+            mrl.addView(but);
+        }
+    }
+
+    public void setDeviceButton(final DeviceButton[] SBList, RelativeLayout mrl){
+        for (int i = 0; i < SBList.length; i++) {
+            final int k = i;
+            final Button but = new Button(this);
+            RelativeLayout.LayoutParams rlt = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
+            rlt.addRule(RelativeLayout.ALIGN_BOTTOM);
+            rlt.leftMargin = (int) (SBList[i].x_value/1080.0 * width);
+            rlt.topMargin = (int) (SBList[i].y_value/1920.0 * height);
+            rlt.width = (int) (210.0/1080 * width);
+            but.setLayoutParams(rlt);
+            but.setText(SBList[i].Name);
+            but.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    PopupMenu popup = new PopupMenu(MainActivity.this, but);
+                    for (int j = 0; j < SBList[k].Szenen.size(); j++) {
+                        popup.getMenu().add((String) (SBList[k].Szenen.get(j)));
+                    }
+                    popup.getMenuInflater().inflate(R.menu.popup, popup.getMenu());
+                    popup.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
+                        public boolean onMenuItemClick(MenuItem item) {
+                            send_to_server("{'Device':'" + SBList[k].Hks + "', 'Command':'" + item.getTitle() + "'}" );
                             return true;
                         }
                     });
@@ -299,6 +337,31 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    public void setSettLabels(ButtonFeatures[] bfList, RelativeLayout mrl){
+        String werte = req_from_server("Settings");
+        try {
+            JSONObject jInpts = new JSONObject(werte);
+            for (int i = 0; i < bfList.length; i++) {
+                TextView tv = new TextView(this);
+                RelativeLayout.LayoutParams rl = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
+                rl.addRule(RelativeLayout.ALIGN_BOTTOM);
+                rl.leftMargin = (int) (bfList[i].x_value/1080.0 * width);
+                rl.topMargin = (int) (bfList[i].y_value/1920.0 * height);
+                //rl.width = 160;
+                //rl.height = buttonH;
+                tv.setLayoutParams(rl);
+                //JSONObject jInpt = jInpts.getJSONObject(bfList[i].Name);
+                String valueread = jInpts.optString(bfList[i].Name).toString();
+                tv.setText(valueread);
+                tv.setBackgroundColor(Color.WHITE);
+                //RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayout);
+                mrl.addView(tv);
+            }
+
+        } catch (JSONException e) {
+
+        }
+    }
     public void showOG() {
         //String sets = req_from_server("Settings");
         String inpts = req_from_server("Inputs_hks");
