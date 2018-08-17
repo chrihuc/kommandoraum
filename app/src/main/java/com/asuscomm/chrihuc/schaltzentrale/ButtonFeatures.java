@@ -10,14 +10,16 @@ public class ButtonFeatures {
     String Text;
     Integer x_value;
     Integer y_value;
+    String unit;
 
-    public ButtonFeatures (String Name, String Command, String Text, Integer x_value, Integer y_value)
+    public ButtonFeatures (String Name, String Command, String Text, Integer x_value, Integer y_value, String unit)
     {
         this.Name = Name;
         this.Command = Command;
         this.Text = Text;
         this.x_value = x_value;
         this.y_value = y_value;
+        this.unit = unit;
     }
     public String getCommandByName(String Name, ButtonFeatures args[])
     {

@@ -77,12 +77,21 @@ public class GcmIntentService extends IntentService {
                 Log.i(TAG, "Completed work @ " + SystemClock.elapsedRealtime());
                 // Post notification of received message.
                 if (titel.equals("Setting")){
+                    Boolean rec_taskmes = prefs.getBoolean("checkbox_pref_showtaskmess", true);
                     Boolean rec_tasks = prefs.getBoolean("checkbox_pref_task", true);
                     if (rec_tasks) {
                         if ( TaskerIntent.testStatus( this ).equals( TaskerIntent.Status.OK ) ) {
                             TaskerIntent i = new TaskerIntent( message );
                             sendBroadcast( i );
-                        }}
+                        }
+                        if (rec_taskmes) {
+                            sendNotification(titel, message);
+                        }
+                    } else {
+                        if (rec_taskmes) {
+                            sendNotification(titel, "Tasker intent not ok");
+                        }
+                    }
                 }else{
                     Boolean rec_mes = prefs.getBoolean("checkbox_pref_mes", true);
                     if (rec_mes) {
@@ -107,7 +116,7 @@ public class GcmIntentService extends IntentService {
         PendingIntent contentIntent = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class), PendingIntent.FLAG_CANCEL_CURRENT);
         NotificationCompat.Builder mBuilder =
                 new NotificationCompat.Builder(this)
-                        .setSmallIcon(R.drawable.ic_stat_gcm)
+                        .setSmallIcon(R.mipmap.steuerzen_icon)
                         .setContentTitle(titel)
                         .setStyle(new NotificationCompat.BigTextStyle()
                                 .bigText(msg))

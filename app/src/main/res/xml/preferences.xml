@@ -19,4 +19,10 @@
         android:summary="@string/preference_rec_tasks_sum"
         android:defaultValue="true" />
 
+    <CheckBoxPreference
+        android:key="checkbox_pref_showtaskmess"
+        android:title="Zeige Tasker Nachricht"
+        android:summary="Debug"
+        android:defaultValue="false" />
+
 </PreferenceScreen>

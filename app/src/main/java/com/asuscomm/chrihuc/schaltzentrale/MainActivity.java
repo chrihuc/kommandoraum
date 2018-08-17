@@ -14,7 +14,7 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.AsyncTask;
 import android.os.StrictMode;
-import android.preference.PreferenceManager;
+//import android.preference.PreferenceManager;
 import android.provider.Settings;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
@@ -26,35 +26,31 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
-import android.widget.EditText;
-import android.widget.ImageButton;
+
 import android.widget.PopupMenu;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
-import android.widget.Toast;
+
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.gcm.GoogleCloudMessaging;
 
-import com.google.android.gms.iid.InstanceID;
 
-import org.apache.http.HttpResponse;
-import org.apache.http.NameValuePair;
-import org.apache.http.client.ClientProtocolException;
-import org.apache.http.client.entity.UrlEncodedFormEntity;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.message.BasicNameValuePair;
-import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.util.ArrayList;
+
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+
 import java.util.Arrays;
-import java.util.List;
+import java.util.Calendar;
+import java.util.Date;
+;
+import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -74,7 +70,6 @@ public class MainActivity extends AppCompatActivity {
     public int height = 1920;
     public int width = 1080;
     public int level = 0;
-
 
     @Override
     public void onBackPressed()
@@ -200,16 +195,16 @@ public class MainActivity extends AppCompatActivity {
         level = 0;
 
         final ButtonFeatures[] inptList = new ButtonFeatures[5];
-        inptList[0] = new ButtonFeatures("V00WOH1RUM1TE01", "V00WOH1RUM1TE01", "V00WOH1RUM1TE01", 600, 450);
-        inptList[1] = new ButtonFeatures("V00WOH1RUM1CO01", "V00WOH1RUM1CO01", "V00WOH1RUM1CO01", 600, 500);
-        inptList[2] = new ButtonFeatures("A00TER1GEN1TE01", "A00TER1GEN1TE01", "A00TER1GEN1TE01", 420, 0);
-        inptList[3] = new ButtonFeatures("V00KUE1RUM1TE02", "V00KUE1RUM1TE02", "V00KUE1RUM1TE02", 300, 1200);
-        inptList[4] = new ButtonFeatures("V00KUE1RUM1ST01", "V00KUE1RUM1ST01", "V00KUE1RUM1ST01", 300, 1250);
+        inptList[0] = new ButtonFeatures("V00WOH1RUM1TE01", "V00WOH1RUM1TE01", "V00WOH1RUM1TE01", 600, 450, "°C");
+        inptList[1] = new ButtonFeatures("V00WOH1RUM1CO01", "V00WOH1RUM1CO01", "V00WOH1RUM1CO01", 600, 500, " ppm");
+        inptList[2] = new ButtonFeatures("A00TER1GEN1TE01", "A00TER1GEN1TE01", "A00TER1GEN1TE01", 420, 0, "°C");
+        inptList[3] = new ButtonFeatures("V00KUE1RUM1TE02", "V00KUE1RUM1TE02", "V00KUE1RUM1TE02", 300, 1200, "°C");
+        inptList[4] = new ButtonFeatures("V00KUE1RUM1ST01", "V00KUE1RUM1ST01", "V00KUE1RUM1ST01", 300, 1250, "°C");
         RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayout);
         setInptLabels(inptList, mrl);
 
         final ButtonFeatures[] SettList = new ButtonFeatures[1];
-        SettList[0] = new ButtonFeatures("Status", "Status", "Status", 0, 0);
+        SettList[0] = new ButtonFeatures("Status", "Status", "Status", 0, 0, "");
         setSettLabels(SettList, mrl);
 
 
@@ -223,9 +218,9 @@ public class MainActivity extends AppCompatActivity {
         setDeviceButton(DvList, mrl);
 
         final ButtonFeatures[] Blist = new ButtonFeatures[3];
-        Blist[0] = new ButtonFeatures("V00KUE1DEK1LI01", "Off", "Aus", 100, 1400);
-        Blist[1] = new ButtonFeatures("V00KUE1DEK1LI02", "Off", "Aus", 100, 1000);
-        Blist[2] = new ButtonFeatures("V00ESS1DEK1LI01", "Off", "Aus", 170, 750);
+        Blist[0] = new ButtonFeatures("V00KUE1DEK1LI01", "Off", "Aus", 100, 1400, "");
+        Blist[1] = new ButtonFeatures("V00KUE1DEK1LI02", "Off", "Aus", 100, 1000,"");
+        Blist[2] = new ButtonFeatures("V00ESS1DEK1LI01", "Off", "Aus", 170, 750, "");
         for (int i = 0; i < 3; i++) {
 
             Button bu = new Button(this);
@@ -326,14 +321,32 @@ public class MainActivity extends AppCompatActivity {
                 tv.setLayoutParams(rl);
                 JSONObject jInpt = jInpts.getJSONObject(bfList[i].Name);
                 String valueread = jInpt.optString("last_Value").toString();
-                tv.setText(valueread);
-                tv.setBackgroundColor(Color.WHITE);
+                tv.setText(valueread + bfList[i].unit);
+                String lastRec_s = jInpt.optString("last1").toString();
+                DateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ENGLISH);
+                Date date = format.parse(lastRec_s);
+                long diff = Calendar.getInstance().getTime().getTime() - date.getTime();
+                if (diff > (1000*60*60)) {
+                    tv.setBackgroundColor(Color.DKGRAY);
+                } else if (diff > (1000*60*240)) { // 60 to 240
+                    tv.setBackgroundColor(Color.RED);
+                } else if (diff > (1000*60*30)) { // 30 to 60
+                    tv.setBackgroundColor(Color.YELLOW);
+                } else if (diff > (1000*60*10)) { // 10 to 30
+                    tv.setBackgroundColor(Color.BLUE);
+                } else if (diff > (1000*60*5)) { // 5 to 10 min
+                    tv.setBackgroundColor(Color.CYAN);
+                }else {  // less than 5 min
+                    tv.setBackgroundColor(Color.GREEN);
+                }
                 //RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayout);
                 mrl.addView(tv);
             }
 
         } catch (JSONException e) {
 
+        } catch (ParseException e) {
+            e.printStackTrace();
         }
     }
 
@@ -369,9 +382,9 @@ public class MainActivity extends AppCompatActivity {
         level = 1;
 
         final ButtonFeatures[] inptList = new ButtonFeatures[3];
-        inptList[0] = new ButtonFeatures("V01BAD1RUM1TE01", "V01BAD1RUM1TE01", "V01BAD1RUM1TE01", 600, 1400);
-        inptList[1] = new ButtonFeatures("V01SCH1RUM1TE01", "V01SCH1RUM1TE01", "V01SCH1RUM1TE01", 200, 1200);
-        inptList[2] = new ButtonFeatures("V01KID1RUM1TE01", "V01KID1RUM1TE01", "V01KID1RUM1TE01", 700, 300);
+        inptList[0] = new ButtonFeatures("V01BAD1RUM1TE01", "V01BAD1RUM1TE01", "V01BAD1RUM1TE01", 600, 1400, "°C");
+        inptList[1] = new ButtonFeatures("V01SCH1RUM1TE01", "V01SCH1RUM1TE01", "V01SCH1RUM1TE01", 200, 1200, "°C");
+        inptList[2] = new ButtonFeatures("V01KID1RUM1TE01", "V01KID1RUM1TE01", "V01KID1RUM1TE01", 700, 300, "°C");
         RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayoutOG);
         setInptLabels(inptList, mrl);
     }
@@ -383,7 +396,7 @@ public class MainActivity extends AppCompatActivity {
         level = 2;
 
         final ButtonFeatures[] inptList = new ButtonFeatures[1];
-        inptList[0] = new ButtonFeatures("V02ZIM1RUM1TE02", "V02ZIM1RUM1TE02", "V02ZIM1RUM1TE02", 300, 1000);
+        inptList[0] = new ButtonFeatures("V02ZIM1RUM1TE02", "V02ZIM1RUM1TE02", "V02ZIM1RUM1TE02", 300, 1000, "°C");
         RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayoutDG);
         setInptLabels(inptList, mrl);
     }
@@ -393,11 +406,37 @@ public class MainActivity extends AppCompatActivity {
         String inpts = req_from_server("Inputs_hks");
         setContentView(R.layout.untergeschoss);
         level = -1;
-
-        final ButtonFeatures[] inptList = new ButtonFeatures[2];
-        inptList[0] = new ButtonFeatures("Vm1ZIM1RUM1TE01", "Vm1ZIM1RUM1TE01", "Vm1ZIM1RUM1TE01", 600, 400);
-        inptList[1] = new ButtonFeatures("Vm1ZIM1PFL1TE01", "Vm1ZIM1PFL1TE01", "Vm1ZIM1PFL1TE01", 300, 300);
         RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayoutUG);
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+
+        final ButtonFeatures[] inptList = new ButtonFeatures[4];
+        inptList[0] = new ButtonFeatures("Vm1ZIM1RUM1TE01", "Vm1ZIM1RUM1TE01", "Vm1ZIM1RUM1TE01", 600, 400, "°C");
+        inptList[1] = new ButtonFeatures("Vm1ZIM1PFL1TE01", "Vm1ZIM1PFL1TE01", "Vm1ZIM1PFL1TE01", 300, 300, "°C");
+        inptList[2] = new ButtonFeatures("Vm1ZIM1RUM1BA01", "Vm1ZIM1RUM1BA01", "Vm1ZIM1RUM1BA01", 600, 450, " mbar");
+        inptList[3] = new ButtonFeatures("Vm1ZIM3RUM1TE01", "Vm1ZIM3RUM1TE01", "Vm1ZIM3RUM1TE01", 800, 1100, "°C");
+
+
+        Boolean rec_mes = prefs.getBoolean("checkbox_pref_showtaskmess", true);
+        if (rec_mes){
+            final Button but = new Button(this);
+            RelativeLayout.LayoutParams rlt = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
+            rlt.addRule(RelativeLayout.ALIGN_BOTTOM);
+            rlt.leftMargin = (int) (0/1080.0 * width);
+            rlt.topMargin = (int) (1400/1920.0 * height);
+            rlt.width = (int) (400.0/1080 * width);
+            but.setLayoutParams(rlt);
+            but.setText("Tasker Test");
+            but.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                //if ( TaskerIntent.testStatus( this ).equals( TaskerIntent.Status.OK ) ) {
+                    TaskerIntent i = new TaskerIntent( "Test" );
+                    sendBroadcast( i );
+                //}
+            }
+            });
+            mrl.addView(but);
+        }
+
         setInptLabels(inptList, mrl);
     }
 
