@@ -25,4 +25,10 @@
         android:summary="Debug"
         android:defaultValue="false" />
 
+    <CheckBoxPreference
+        android:key="checkbox_pref_devel"
+        android:title="Zeige Entwickler Werte"
+        android:summary="Debug"
+        android:defaultValue="false" />
+
 </PreferenceScreen>

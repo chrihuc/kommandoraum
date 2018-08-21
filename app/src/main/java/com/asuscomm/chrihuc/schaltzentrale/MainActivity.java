@@ -210,7 +210,7 @@ public class MainActivity extends AppCompatActivity {
 
         final SzenenButton[] SzList = new SzenenButton[2];
         SzList[0] = new SzenenButton("A/V", Arrays.asList("TV", "SonosEG", "Radio", "AVaus", "Kino", "KinoAus"), 50, 300);
-        SzList[1] = new SzenenButton("Status", Arrays.asList("Wach", "SchlafenGehen", "SchlafenGehenLeise", "Schlafen", "Gehen", "Gegangen"), 50, 450);
+        SzList[1] = new SzenenButton("Status", Arrays.asList("Wach", "Leise", "SchlafenGehen", "SchlafenGehenLeise", "Schlafen", "Gehen", "Gegangen"), 50, 450);
         setSzenenButton(SzList, mrl);
 
         final DeviceButton[] DvList = new DeviceButton[1];
@@ -408,13 +408,16 @@ public class MainActivity extends AppCompatActivity {
         level = -1;
         RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayoutUG);
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+        Boolean devel = prefs.getBoolean("checkbox_pref_devel", true);
 
-        final ButtonFeatures[] inptList = new ButtonFeatures[4];
+        final ButtonFeatures[] inptList = new ButtonFeatures[6];
         inptList[0] = new ButtonFeatures("Vm1ZIM1RUM1TE01", "Vm1ZIM1RUM1TE01", "Vm1ZIM1RUM1TE01", 600, 400, "°C");
         inptList[1] = new ButtonFeatures("Vm1ZIM1PFL1TE01", "Vm1ZIM1PFL1TE01", "Vm1ZIM1PFL1TE01", 300, 300, "°C");
         inptList[2] = new ButtonFeatures("Vm1ZIM1RUM1BA01", "Vm1ZIM1RUM1BA01", "Vm1ZIM1RUM1BA01", 600, 450, " mbar");
         inptList[3] = new ButtonFeatures("Vm1ZIM3RUM1TE01", "Vm1ZIM3RUM1TE01", "Vm1ZIM3RUM1TE01", 800, 1100, "°C");
-
+        inptList[4] = new ButtonFeatures("Vm1ZIM2RUM1TE01", "Vm1ZIM2RUM1TE01", "Vm1ZIM2RUM1TE01", 300, 1100, "°C");
+        inptList[5] = new ButtonFeatures("Vm1ZIM2RUM1HU01", "Vm1ZIM2RUM1HU01", "Vm1ZIM2RUM1HU01", 300, 1150, "%");
+        setInptLabels(inptList, mrl);
 
         Boolean rec_mes = prefs.getBoolean("checkbox_pref_showtaskmess", true);
         if (rec_mes){
@@ -437,7 +440,6 @@ public class MainActivity extends AppCompatActivity {
             mrl.addView(but);
         }
 
-        setInptLabels(inptList, mrl);
     }
 
 
