@@ -16,6 +16,7 @@ import android.os.AsyncTask;
 import android.os.StrictMode;
 //import android.preference.PreferenceManager;
 import android.provider.Settings;
+import android.provider.SyncStateContract;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
@@ -30,13 +31,19 @@ import android.widget.Button;
 import android.widget.PopupMenu;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 
-import com.google.android.gms.common.ConnectionResult;
-import com.google.android.gms.common.GooglePlayServicesUtil;
-import com.google.android.gms.gcm.GoogleCloudMessaging;
-
-
+import org.eclipse.paho.android.service.MqttAndroidClient;
+import org.eclipse.paho.client.mqttv3.DisconnectedBufferOptions;
+import org.eclipse.paho.client.mqttv3.IMqttActionListener;
+import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
+import org.eclipse.paho.client.mqttv3.IMqttMessageListener;
+import org.eclipse.paho.client.mqttv3.IMqttToken;
+import org.eclipse.paho.client.mqttv3.MqttCallbackExtended;
+import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
+import org.eclipse.paho.client.mqttv3.MqttException;
+import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -63,8 +70,11 @@ public class MainActivity extends AppCompatActivity {
     private static final String PROPERTY_APP_VERSION = "appVersion";
     TextView mDisplay;
 
+
+    MqttAndroidClient mqttAndroidClient;
+    String clientId = "chris";
+
     String SENDER_ID = "568669847245";
-    GoogleCloudMessaging gcm;
 
     public Boolean server_online = true;
     public int height = 1920;
@@ -115,7 +125,6 @@ public class MainActivity extends AppCompatActivity {
         //setHasOptionsMenu(true);
 
         ConnectivityManager connManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-		NetworkInfo mWifi = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
         context = getApplicationContext();
 
         //INSERT ping or IP check to see what is online
@@ -123,12 +132,6 @@ public class MainActivity extends AppCompatActivity {
         //Google play services for receiving messages
 
         Activity act = this;
-        int resultCode = GooglePlayServicesUtil.isGooglePlayServicesAvailable(this);
-        if (checkPlayServices(act) && server_online) {
-            gcm = GoogleCloudMessaging.getInstance(this);
-            regid = getRegistrationId(context);
-            if (regid.isEmpty()) {registerInBackground();} else{sendRegistrationIdToBackend(regid);}
-        } else { Log.i(TAG, "No valid Google Play Services APK found.");}
 
         Display display = getWindowManager().getDefaultDisplay();
         Point size = new Point();
@@ -136,6 +139,68 @@ public class MainActivity extends AppCompatActivity {
         height = size.y; //S7 1920 => /1920 * height /moto 888
         width = size.x; //S7 1080 => /1080 * width /moto 540
 
+        clientId = clientId + System.currentTimeMillis();
+
+        mqttAndroidClient = new MqttAndroidClient(getApplicationContext(), "tcp://192.168.192.10:1883", "chriss7listener");
+        mqttAndroidClient.setCallback(new MqttCallbackExtended() {
+            @Override
+            public void connectComplete(boolean reconnect, String serverURI) {
+
+                if (reconnect) {
+                    addToHistory("Reconnected to : " + serverURI);
+                    // Because Clean Session is true, we need to re-subscribe
+                    subscribeToTopic();
+                } else {
+                    addToHistory("Connected to: " + serverURI);
+                }
+            }
+
+            @Override
+            public void connectionLost(Throwable cause) {
+                addToHistory("The Connection was lost.");
+            }
+
+            @Override
+            public void messageArrived(String topic, MqttMessage message) throws Exception {
+                addToHistory("Incoming message: " + new String(message.getPayload()));
+            }
+
+            @Override
+            public void deliveryComplete(IMqttDeliveryToken token) {
+
+            }
+        });
+
+        MqttConnectOptions mqttConnectOptions = new MqttConnectOptions();
+        mqttConnectOptions.setAutomaticReconnect(true);
+        mqttConnectOptions.setCleanSession(false);
+        mqttConnectOptions.setUserName("");
+        mqttConnectOptions.setPassword("".toCharArray());
+
+        try {
+            //addToHistory("Connecting to " + serverUri);
+            mqttAndroidClient.connect(mqttConnectOptions, null, new IMqttActionListener() {
+                @Override
+                public void onSuccess(IMqttToken asyncActionToken) {
+                    DisconnectedBufferOptions disconnectedBufferOptions = new DisconnectedBufferOptions();
+                    disconnectedBufferOptions.setBufferEnabled(true);
+                    disconnectedBufferOptions.setBufferSize(100);
+                    disconnectedBufferOptions.setPersistBuffer(false);
+                    disconnectedBufferOptions.setDeleteOldestMessages(false);
+                    mqttAndroidClient.setBufferOpts(disconnectedBufferOptions);
+                    subscribeToTopic();
+                }
+
+                @Override
+                public void onFailure(IMqttToken asyncActionToken, Throwable exception) {
+                    addToHistory("Failed to connect");
+                }
+            });
+
+
+        } catch (MqttException ex){
+            ex.printStackTrace();
+        }
         showMain();
     }
 
@@ -441,21 +506,38 @@ public class MainActivity extends AppCompatActivity {
         }
 
     }
+    public void subscribeToTopic(){
+        try {
+            mqttAndroidClient.subscribe("AES/Prio1", 1, null, new IMqttActionListener() {
+                @Override
+                public void onSuccess(IMqttToken asyncActionToken) {
+                    addToHistory("Subscribed!");
+                }
 
+                @Override
+                public void onFailure(IMqttToken asyncActionToken, Throwable exception) {
+                    addToHistory("Failed to subscribe");
+                }
+            });
 
-    public boolean checkPlayServices(Activity act) {
-        int resultCode = GooglePlayServicesUtil.isGooglePlayServicesAvailable(act);
-        if (resultCode != ConnectionResult.SUCCESS) {
-            if (GooglePlayServicesUtil.isUserRecoverableError(resultCode)) {
-                GooglePlayServicesUtil.getErrorDialog(resultCode, act,
-                        PLAY_SERVICES_RESOLUTION_REQUEST).show();
-            } else {
-                Log.i(TAG, "This device is not supported.");
-                //finish();
-            }
-            return false;
+            // THIS DOES NOT WORK!
+            mqttAndroidClient.subscribe("AES/Prio1", 0, new IMqttMessageListener() {
+                @Override
+                public void messageArrived(String topic, MqttMessage message) throws Exception {
+                    // message Arrived!
+                    System.out.println("Message: " + topic + " : " + new String(message.getPayload()));
+                }
+            });
+
+        } catch (MqttException ex){
+            System.err.println("Exception whilst subscribing");
+            ex.printStackTrace();
         }
-        return true;
+    }
+
+    private void addToHistory(String mainText){
+        System.out.println("LOG: " + mainText);
+
     }
 
     /**
@@ -532,43 +614,6 @@ public class MainActivity extends AppCompatActivity {
      * Stores the registration ID and the app versionCode in the application's
      * shared preferences.
      */
-    public void registerInBackground() {
-        new AsyncTask<Void, Void, String>() {
-            @Override
-            protected String doInBackground(Void... params) {
-                String msg = "";
-                try {
-                    if (gcm == null) {
-                        gcm = GoogleCloudMessaging.getInstance(context);
-                    }
-                    regid = gcm.register(SENDER_ID);
-                    msg = "Device registered, registration ID=" + regid;
-
-                    // You should send the registration ID to your server over HTTP, so it
-                    // can use GCM/HTTP or CCS to send messages to your app.
-                    sendRegistrationIdToBackend(regid);
-
-                    // For this demo: we don't need to send it because the device will send
-                    // upstream messages to a server that echo back the message using the
-                    // 'from' address in the message.
-
-                    // Persist the regID - no need to register again.
-                    storeRegistrationId(context, regid);
-                } catch (IOException ex) {
-                    msg = "Error :" + ex.getMessage();
-                    // If there is an error, don't just keep trying to register.
-                    // Require the user to click a button again, or perform
-                    // exponential back-off.
-                }
-                return msg;
-            }
-
-            @Override
-            protected void onPostExecute(String msg) {
-                mDisplay.append(msg + "\n");
-            }
-        }.execute(null, null, null);
-    }
 
     /**
      * Sends the registration ID to your server over HTTP, so it can use GCM/HTTP or CCS to send
