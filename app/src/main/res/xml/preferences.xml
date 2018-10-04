@@ -3,7 +3,31 @@
 
     <EditTextPreference
         android:title="@string/preference_name_title"
-        android:key="@string/preference_name_key"
+        android:key="mqttId"
+        android:defaultValue="@string/preference_name_default"
+        android:inputType="textMultiLine" />
+
+    <EditTextPreference
+        android:title="MQTT Server"
+        android:key="mqttServer"
+        android:defaultValue="@string/preference_name_default"
+        android:inputType="textMultiLine" />
+
+    <EditTextPreference
+        android:title="MQTT Port"
+        android:key="mqttPort"
+        android:defaultValue="@string/preference_name_default"
+        android:inputType="textMultiLine" />
+
+    <EditTextPreference
+        android:title="MQTT Username"
+        android:key="mqttUser"
+        android:defaultValue="@string/preference_name_default"
+        android:inputType="textMultiLine" />
+
+    <EditTextPreference
+        android:title="MQTT Passwort"
+        android:key="mqttPass"
         android:defaultValue="@string/preference_name_default"
         android:inputType="textMultiLine" />
 

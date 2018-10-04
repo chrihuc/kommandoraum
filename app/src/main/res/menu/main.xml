@@ -6,4 +6,5 @@
     <item android:id="@+id/ug" android:orderInCategory="100" android:title="Keller"></item>
     <item android:id="@+id/settings" android:orderInCategory="100" android:title="Settings"></item>
     <item android:id="@+id/wecker" android:orderInCategory="100" android:title="Wecker"></item>
+    <item android:id="@+id/notifications" android:orderInCategory="100" android:title="Nachrichten"></item>
 </menu>

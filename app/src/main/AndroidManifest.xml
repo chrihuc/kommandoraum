@@ -38,19 +38,16 @@
                 android:name="android.support.PARENT_ACTIVITY"
                 android:value="com.asuscomm.chrihuc.schaltzentrale.MainActivity" />
         </activity>
-        <!--
-          WakefulBroadcastReceiver that will receive intents from GCM
-          services and hand them to the custom IntentService.
 
-          The com.google.android.c2dm.permission.SEND permission is necessary
-          so only GCM services can send data messages for the app.
-        -->
-        <!--<receiver android:name=".ConnectivityReceiver">
+        <!-- BroadcastReceiver that starts MqttConnectionManagerService on device boot -->
+        <receiver android:name=".MqttServiceStartReceiver">
             <intent-filter>
-                <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
-        </receiver>	-->
+        </receiver>
+
         <service android:name="org.eclipse.paho.android.service.MqttService" />
+        <service android:name=".MqttConnectionManagerService" />
 
 
 <!--        <receiver

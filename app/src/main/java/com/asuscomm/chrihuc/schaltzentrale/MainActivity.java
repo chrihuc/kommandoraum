@@ -2,11 +2,16 @@ package com.asuscomm.chrihuc.schaltzentrale;
 import com.asuscomm.chrihuc.schaltzentrale.SocketClient;
 
 import android.app.Activity;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Point;
+import android.os.PowerManager;
 import android.preference.PreferenceManager;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -17,17 +22,23 @@ import android.os.StrictMode;
 //import android.preference.PreferenceManager;
 import android.provider.Settings;
 import android.provider.SyncStateContract;
+import android.support.annotation.NonNull;
+import android.support.v4.app.NotificationCompat;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
+import android.text.style.BackgroundColorSpan;
 import android.util.Log;
 import android.view.Display;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 
+import android.widget.ListView;
 import android.widget.PopupMenu;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
@@ -53,33 +64,45 @@ import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 ;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
 
-    public static final String EXTRA_MESSAGE = "message";
-    public static final String PROPERTY_REG_ID = "registration_id";
     Context context;
-    String regid;
-    private static final int PLAY_SERVICES_RESOLUTION_REQUEST = 9000;
+
     static final String TAG = "Schaltzentrale";
     private static final String PROPERTY_APP_VERSION = "appVersion";
     TextView mDisplay;
 
+    Map<String, ValueList> sensoren = new HashMap<String, ValueList>();
 
     MqttAndroidClient mqttAndroidClient;
-    String clientId = "chris";
 
-    String SENDER_ID = "568669847245";
+    private NotificationManager mNotificationManager;
+    public static int NOTIFICATION_ID = 1;
 
     public Boolean server_online = true;
     public int height = 1920;
     public int width = 1080;
     public int level = 0;
+
+    public int concounter = 0;
+    public int mescounter = 0;
+    public boolean ison = true;
+
+    private ArrayList<String> items;
+    private ArrayAdapter<String> itemsAdapter;
+    private ListView lvItems;
+    public ArrayList<String> messages;
+
+    private BroadcastReceiver mReceiver = null;
 
     @Override
     public void onBackPressed()
@@ -96,20 +119,9 @@ public class MainActivity extends AppCompatActivity {
             send_to_server("{'Szene':'EGLauter'}");
         }
         if ((keyCode == KeyEvent.KEYCODE_BACK)) {
-            switch(level) {
-                case 0:
-                    showMain();
-                    break;
-                case -1:
-                    showUG();
-                    break;
-                case 1:
-                    showOG();
-                    break;
-                case 2:
-                    showDG();
-                    break;
-            }
+            showMain();
+            //unSubscribe("AES/Prio2");
+            //Toast.makeText(getBaseContext(), "Unsub to Prio2", Toast.LENGTH_LONG).show();
         }
         return true;
     }
@@ -122,86 +134,80 @@ public class MainActivity extends AppCompatActivity {
         StrictMode.setThreadPolicy(policy);
         super.onCreate(savedInstanceState);
 
+        // initialize receiver
+        final IntentFilter filter = new IntentFilter(Intent.ACTION_SCREEN_ON);
+        filter.addAction(Intent.ACTION_SCREEN_OFF);
+        mReceiver = new ScreenReceiver();
+        registerReceiver(mReceiver, filter);
         //setHasOptionsMenu(true);
 
         ConnectivityManager connManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         context = getApplicationContext();
 
-        //INSERT ping or IP check to see what is online
-
-        //Google play services for receiving messages
-
         Activity act = this;
 
+        messages = new ArrayList<String>();
         Display display = getWindowManager().getDefaultDisplay();
         Point size = new Point();
         display.getSize(size);
         height = size.y; //S7 1920 => /1920 * height /moto 888
         width = size.x; //S7 1080 => /1080 * width /moto 540
 
-        clientId = clientId + System.currentTimeMillis();
+        Intent i = new Intent(this, EinstellungenActivity.class);
+        startActivity(i);
 
-        mqttAndroidClient = new MqttAndroidClient(getApplicationContext(), "tcp://192.168.192.10:1883", "chriss7listener");
-        mqttAndroidClient.setCallback(new MqttCallbackExtended() {
-            @Override
-            public void connectComplete(boolean reconnect, String serverURI) {
-
-                if (reconnect) {
-                    addToHistory("Reconnected to : " + serverURI);
-                    // Because Clean Session is true, we need to re-subscribe
-                    subscribeToTopic();
-                } else {
-                    addToHistory("Connected to: " + serverURI);
-                }
-            }
-
-            @Override
-            public void connectionLost(Throwable cause) {
-                addToHistory("The Connection was lost.");
-            }
-
-            @Override
-            public void messageArrived(String topic, MqttMessage message) throws Exception {
-                addToHistory("Incoming message: " + new String(message.getPayload()));
-            }
-
-            @Override
-            public void deliveryComplete(IMqttDeliveryToken token) {
-
-            }
-        });
-
-        MqttConnectOptions mqttConnectOptions = new MqttConnectOptions();
-        mqttConnectOptions.setAutomaticReconnect(true);
-        mqttConnectOptions.setCleanSession(false);
-        mqttConnectOptions.setUserName("");
-        mqttConnectOptions.setPassword("".toCharArray());
-
-        try {
-            //addToHistory("Connecting to " + serverUri);
-            mqttAndroidClient.connect(mqttConnectOptions, null, new IMqttActionListener() {
-                @Override
-                public void onSuccess(IMqttToken asyncActionToken) {
-                    DisconnectedBufferOptions disconnectedBufferOptions = new DisconnectedBufferOptions();
-                    disconnectedBufferOptions.setBufferEnabled(true);
-                    disconnectedBufferOptions.setBufferSize(100);
-                    disconnectedBufferOptions.setPersistBuffer(false);
-                    disconnectedBufferOptions.setDeleteOldestMessages(false);
-                    mqttAndroidClient.setBufferOpts(disconnectedBufferOptions);
-                    subscribeToTopic();
-                }
-
-                @Override
-                public void onFailure(IMqttToken asyncActionToken, Throwable exception) {
-                    addToHistory("Failed to connect");
-                }
-            });
-
-
-        } catch (MqttException ex){
-            ex.printStackTrace();
-        }
+        getMqttConnection();
         showMain();
+    }
+
+    @Override
+    protected void onPause() {
+        // when the screen is about to turn off
+        if (ScreenReceiver.wasScreenOn) {
+            // this is the case when onPause() is called by the system due to a screen state change
+            unSubscribe("Inputs/#");
+            unSubscribe("Settings/Status");
+            Log.e("MYAPP", "SCREEN TURNED OFF");
+        } else {
+            // this is when onPause() is called when the screen state has not changed
+            unSubscribe("Inputs/#");
+            unSubscribe("Settings/Status");
+        }
+        //Toast.makeText(getBaseContext(), "Unsub to Inputs", Toast.LENGTH_LONG).show();
+        ison = false;
+        concounter = 0;
+        mescounter = 0;
+        super.onPause();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // only when screen turns on
+        //Toast.makeText(getBaseContext(), "Subscribing to Inputs " + concounter + " reconnects, " + mescounter + " messages.", Toast.LENGTH_LONG).show();
+        concounter = 0;
+        mescounter = 0;
+        if (!ScreenReceiver.wasScreenOn) {
+            // this is when onResume() is called due to a screen state change
+            Log.e("MYAPP", "SCREEN TURNED ON");
+            subscribeToTopic("Inputs/#");
+            subscribeToTopic("Settings/Status");
+        } else {
+            // this is when onResume() is called when the screen state has not changed
+            subscribeToTopic("Inputs/#");
+            subscribeToTopic("Settings/Status");
+        }
+        ison = true;
+        startService(new Intent(this, MqttConnectionManagerService.class));
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (mReceiver != null) {
+            unregisterReceiver(mReceiver);
+            mReceiver = null;
+        }
+        super.onDestroy();
     }
 
     @Override
@@ -240,7 +246,28 @@ public class MainActivity extends AppCompatActivity {
             showWecker();
             return true;
         }
+        if (id == R.id.notifications) {
+            showNachrichten();
+            return true;
+        }
         return true;
+    }
+
+    public void showViews(int level){
+        switch(level) {
+            case 0:
+                showMain();
+                break;
+            case -1:
+                showUG();
+                break;
+            case 1:
+                showOG();
+                break;
+            case 2:
+                showDG();
+                break;
+        }
     }
 
     public void showWecker() {
@@ -257,16 +284,25 @@ public class MainActivity extends AppCompatActivity {
     public void showMain() {
         //String sets = req_from_server("Settings");
         setContentView(R.layout.activity_main);
+
         level = 0;
 
-        final ButtonFeatures[] inptList = new ButtonFeatures[5];
+        final ButtonFeatures[] inptList = new ButtonFeatures[6];
         inptList[0] = new ButtonFeatures("V00WOH1RUM1TE01", "V00WOH1RUM1TE01", "V00WOH1RUM1TE01", 600, 450, "°C");
         inptList[1] = new ButtonFeatures("V00WOH1RUM1CO01", "V00WOH1RUM1CO01", "V00WOH1RUM1CO01", 600, 500, " ppm");
         inptList[2] = new ButtonFeatures("A00TER1GEN1TE01", "A00TER1GEN1TE01", "A00TER1GEN1TE01", 420, 0, "°C");
         inptList[3] = new ButtonFeatures("V00KUE1RUM1TE02", "V00KUE1RUM1TE02", "V00KUE1RUM1TE02", 300, 1200, "°C");
         inptList[4] = new ButtonFeatures("V00KUE1RUM1ST01", "V00KUE1RUM1ST01", "V00KUE1RUM1ST01", 300, 1250, "°C");
+
+        inptList[5] = new ButtonFeatures("Status", "Status", "Status", 0, 0, "");
         RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayout);
         setInptLabels(inptList, mrl);
+
+        final DigiObj[] doList = new DigiObj[3];
+        doList[0] = new DigiObj("V00WOH1TUE1DI01",600, 0);
+        doList[1] = new DigiObj("V00KUE1TUE1DI01",0, 750);
+        doList[2] = new DigiObj("V00FLU1TUE1DI01",650, 1450);
+        setDigiObj(doList, mrl);
 
         final ButtonFeatures[] SettList = new ButtonFeatures[1];
         SettList[0] = new ButtonFeatures("Status", "Status", "Status", 0, 0, "");
@@ -274,7 +310,7 @@ public class MainActivity extends AppCompatActivity {
 
 
         final SzenenButton[] SzList = new SzenenButton[2];
-        SzList[0] = new SzenenButton("A/V", Arrays.asList("TV", "SonosEG", "Radio", "AVaus", "Kino", "KinoAus"), 50, 300);
+        SzList[0] = new SzenenButton("A/V", Arrays.asList("TV", "SonosEG", "Radio", "AVaus", "Kino", "KinoAus", "LesenEG"), 50, 300);
         SzList[1] = new SzenenButton("Status", Arrays.asList("Wach", "Leise", "SchlafenGehen", "SchlafenGehenLeise", "Schlafen", "Gehen", "Gegangen"), 50, 450);
         setSzenenButton(SzList, mrl);
 
@@ -306,8 +342,61 @@ public class MainActivity extends AppCompatActivity {
             });
             //RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayout);
             mrl.addView(bu);
+
         }
-    }
+        mrl.setOnTouchListener(new OnSwipeTouchListener(MainActivity.this) {
+
+            @Override
+            public void onClick() {
+                super.onClick();
+                // your on click here
+            }
+
+            @Override
+            public void onDoubleClick() {
+                super.onDoubleClick();
+                // your on onDoubleClick here
+            }
+
+            @Override
+            public void onLongClick() {
+                super.onLongClick();
+                // your on onLongClick here
+            }
+
+            @Override
+            public void onSwipeUp() {
+                super.onSwipeUp();
+                level--;
+                if (level <-1){
+                    level = 2;
+                }
+                showViews(level);
+            }
+
+            @Override
+            public void onSwipeDown() {
+                super.onSwipeDown();
+                level++;
+                if (level > 2){
+                    level = -1;
+                }
+                showViews(level);
+            }
+
+            @Override
+            public void onSwipeLeft() {
+                super.onSwipeLeft();
+                // your swipe left here.
+            }
+
+            @Override
+            public void onSwipeRight() {
+                super.onSwipeRight();
+                // your swipe right here.
+            }
+        });
+        }
 
     public void setSzenenButton(final SzenenButton[] SBList, RelativeLayout mrl){
         for (int i = 0; i < SBList.length; i++) {
@@ -371,26 +460,161 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    public void getMqttConnection(){
+
+        final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+
+        final String clientId = prefs.getString("mqttId", "");
+
+        String mqttServer = prefs.getString("mqttServer", "");
+        String mqttPort = prefs.getString("mqttPort", "");
+        String mqttUser = prefs.getString("mqttUser", "");
+        String mqttPass = prefs.getString("mqttPass", "");
+
+        if (clientId.equals(new String()) || (mqttPort.equals(new String())) || (mqttServer.equals(new String()))
+                || (mqttUser.equals(new String())) || (mqttPass.equals(new String()))){
+            startActivity(new Intent(this, EinstellungenActivity.class));
+        } else {
+
+            String clientId2 = clientId + "_app_" + System.currentTimeMillis();
+            mqttServer = "ssl://" + mqttServer + ":" + mqttPort;
+
+            mqttAndroidClient = new MqttAndroidClient(getApplicationContext(), mqttServer, clientId2);
+            mqttAndroidClient.setCallback(new MqttCallbackExtended() {
+                @Override
+                public void connectComplete(boolean reconnect, String serverURI) {
+
+                    if (reconnect) {
+                        addToHistory("Reconnected to : " + serverURI);
+                        // Because Clean Session is true, we need to re-subscribe
+                        if (ison){
+                            subscribeToTopic("Inputs/#");
+                            subscribeToTopic("Settings/Status");
+                        }
+                        subscribeToTopic("Message/" + clientId);
+                    } else {
+                        addToHistory("Reconnected to: " + serverURI);
+                        if (ison){
+                            subscribeToTopic("Inputs/#");
+                            subscribeToTopic("Settings/Status");
+                        }
+                        subscribeToTopic("Message/" + clientId);
+                    }
+                    //Toast.makeText(getBaseContext(), "Connected to old MQTT", Toast.LENGTH_SHORT).show();
+                    concounter++;
+                }
+
+                @Override
+                public void connectionLost(Throwable cause) {
+                    addToHistory("The Connection was lost.");
+                }
+
+                @Override
+                public void messageArrived(String topic, MqttMessage message) throws Exception {
+                    addToHistory("Incoming message: " + new String(message.getPayload()));
+                    mescounter++;
+                    if (topic.toLowerCase().contains("Message".toLowerCase())) {
+                        sendNotification("Nachricht", new String(message.getPayload()), message.isRetained());
+                        messages.add(new String(message.getPayload()));
+                    } else if (topic.toLowerCase().contains("Prio".toLowerCase())){
+                        messages.add(new String(message.getPayload()));
+                    } else if (ison){
+                        getValuesMqtt(message);
+                        showViews(level);
+                    }
+                }
+
+                @Override
+                public void deliveryComplete(IMqttDeliveryToken token) {
+
+                }
+            });
+
+            MqttConnectOptions mqttConnectOptions = new MqttConnectOptions();
+            mqttConnectOptions.setAutomaticReconnect(true);
+            mqttConnectOptions.setCleanSession(true);
+            mqttConnectOptions.setUserName(mqttUser);
+            mqttConnectOptions.setPassword(mqttPass.toCharArray());
+            mqttConnectOptions.setKeepAliveInterval(300);
+
+            try {
+                //addToHistory("Connecting to " + serverUri);
+                mqttAndroidClient.connect(mqttConnectOptions, null, new IMqttActionListener() {
+                    @Override
+                    public void onSuccess(IMqttToken asyncActionToken) {
+                        DisconnectedBufferOptions disconnectedBufferOptions = new DisconnectedBufferOptions();
+                        disconnectedBufferOptions.setBufferEnabled(true);
+                        disconnectedBufferOptions.setBufferSize(100);
+                        disconnectedBufferOptions.setPersistBuffer(false);
+                        disconnectedBufferOptions.setDeleteOldestMessages(false);
+                        mqttAndroidClient.setBufferOpts(disconnectedBufferOptions);
+                        if (ison){
+                            subscribeToTopic("Inputs/#");
+                            subscribeToTopic("Settings/Status");
+                        }
+                        subscribeToTopic("Message/" + clientId);
+                        //Toast.makeText(getBaseContext(), "Connected to old MQTT", Toast.LENGTH_SHORT).show();
+                    }
+
+                    @Override
+                    public void onFailure(IMqttToken asyncActionToken, Throwable exception) {
+                        addToHistory("Failed to connect");
+                    }
+                });
+
+
+            } catch (MqttException ex){
+                ex.printStackTrace();
+            }
+
+        }
+    }
+
+    public void getValuesMqtt(MqttMessage message){
+        String telegram = message.toString();
+        try{
+            JSONObject jMqtt = new JSONObject(telegram);
+            String jValue = jMqtt.optString("Value").toString();
+            String jKey = "leer";
+            if (jMqtt.has("HKS")) {
+                jKey = jMqtt.optString("HKS");
+            }
+            if (jMqtt.has("Setting")) {
+                jKey = jMqtt.optString("Setting");
+            }
+            String TS = jMqtt.optString("ts");
+            ValueList sensor = new ValueList(jKey, jValue, TS);
+            sensoren.put(jKey, sensor);
+        } catch (JSONException e) {
+
+        }
+    }
+
     public void setInptLabels(ButtonFeatures[] bfList, RelativeLayout mrl){
-        String werte = req_from_server("Inputs_hks");
-        try {
-            JSONObject jInpts = new JSONObject(werte);
-            for (int i = 0; i < bfList.length; i++) {
-                TextView tv = new TextView(this);
-                RelativeLayout.LayoutParams rl = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
-                rl.addRule(RelativeLayout.ALIGN_BOTTOM);
-                rl.leftMargin = (int) (bfList[i].x_value/1080.0 * width);
-                rl.topMargin = (int) (bfList[i].y_value/1920.0 * height);
-                //rl.width = 160;
-                //rl.height = buttonH;
-                tv.setLayoutParams(rl);
-                JSONObject jInpt = jInpts.getJSONObject(bfList[i].Name);
-                String valueread = jInpt.optString("last_Value").toString();
+        //String werte = req_from_server("Inputs_hks");
+        String werte = "";
+        for (int i = 0; i < bfList.length; i++) {
+            TextView tv = new TextView(this);
+            RelativeLayout.LayoutParams rl = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
+            rl.addRule(RelativeLayout.ALIGN_BOTTOM);
+            rl.leftMargin = (int) (bfList[i].x_value/1080.0 * width);
+            rl.topMargin = (int) (bfList[i].y_value/1920.0 * height);
+            tv.setLayoutParams(rl);
+            tv.setTag(bfList[i].Name);
+            ValueList sensor = sensoren.get(bfList[i].Name);
+            if (sensor != null){
+                String valueread = sensor.getValue();
                 tv.setText(valueread + bfList[i].unit);
-                String lastRec_s = jInpt.optString("last1").toString();
-                DateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ENGLISH);
-                Date date = format.parse(lastRec_s);
-                long diff = Calendar.getInstance().getTime().getTime() - date.getTime();
+                String lastRec_s = sensor.getTS();
+                DateFormat format = new SimpleDateFormat("yyyy-MM-dd' 'HH:mm:ss", Locale.ENGLISH);
+                Date date = new Date(0);
+                Date jetzt = new Date();
+                try {
+                    date = format.parse(lastRec_s);
+                } catch (ParseException e) {
+                    e.printStackTrace();
+                }
+                long diff = jetzt.getTime() - date.getTime();
                 if (diff > (1000*60*60)) {
                     tv.setBackgroundColor(Color.DKGRAY);
                 } else if (diff > (1000*60*240)) { // 60 to 240
@@ -404,19 +628,40 @@ public class MainActivity extends AppCompatActivity {
                 }else {  // less than 5 min
                     tv.setBackgroundColor(Color.GREEN);
                 }
-                //RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayout);
                 mrl.addView(tv);
             }
+        }
+    }
 
-        } catch (JSONException e) {
+    public void setDigiObj(DigiObj[] doList, RelativeLayout mrl){
 
-        } catch (ParseException e) {
-            e.printStackTrace();
+        for (int i = 0; i < doList.length; i++) {
+            View tv = new View(this);
+            RelativeLayout.LayoutParams rl = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
+            rl.addRule(RelativeLayout.ALIGN_BOTTOM);
+            rl.leftMargin = (int) (doList[i].x_value/1080.0 * width);
+            rl.topMargin = (int) (doList[i].y_value/1920.0 * height);
+            rl.height = (int) (30/1920.0 * height);
+            rl.width = (int) (30/1920.0 * height);
+            tv.setLayoutParams(rl);
+            ValueList sensor = sensoren.get(doList[i].HKS);
+            if (sensor != null){
+                String valueread = sensor.getValue();
+                Float value = Float.parseFloat(valueread);
+                //tv.setText("x");
+                if (value > 0) { // 60 to 240
+                    tv.setBackgroundColor(Color.GREEN);
+                }else {  // less than 5 min
+                    tv.setBackgroundColor(Color.RED);
+                }
+                mrl.addView(tv);
+            }
         }
     }
 
     public void setSettLabels(ButtonFeatures[] bfList, RelativeLayout mrl){
-        String werte = req_from_server("Settings");
+        //String werte = req_from_server("Settings");
+        String werte = "";
         try {
             JSONObject jInpts = new JSONObject(werte);
             for (int i = 0; i < bfList.length; i++) {
@@ -440,9 +685,10 @@ public class MainActivity extends AppCompatActivity {
 
         }
     }
+
     public void showOG() {
         //String sets = req_from_server("Settings");
-        String inpts = req_from_server("Inputs_hks");
+        //String inpts = req_from_server("Inputs_hks");
         setContentView(R.layout.obergeschoss);
         level = 1;
 
@@ -452,11 +698,32 @@ public class MainActivity extends AppCompatActivity {
         inptList[2] = new ButtonFeatures("V01KID1RUM1TE01", "V01KID1RUM1TE01", "V01KID1RUM1TE01", 700, 300, "°C");
         RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayoutOG);
         setInptLabels(inptList, mrl);
+        mrl.setOnTouchListener(new OnSwipeTouchListener(MainActivity.this) {
+            @Override
+            public void onSwipeUp() {
+                super.onSwipeUp();
+                level--;
+                if (level <-1){
+                    level = 2;
+                }
+                showViews(level);
+            }
+
+            @Override
+            public void onSwipeDown() {
+                super.onSwipeDown();
+                level++;
+                if (level > 2){
+                    level = -1;
+                }
+                showViews(level);
+            }
+        });
     }
 
     public void showDG() {
         //String sets = req_from_server("Settings");
-        String inpts = req_from_server("Inputs_hks");
+        //String inpts = req_from_server("Inputs_hks");
         setContentView(R.layout.dachgeschoss);
         level = 2;
 
@@ -464,27 +731,56 @@ public class MainActivity extends AppCompatActivity {
         inptList[0] = new ButtonFeatures("V02ZIM1RUM1TE02", "V02ZIM1RUM1TE02", "V02ZIM1RUM1TE02", 300, 1000, "°C");
         RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayoutDG);
         setInptLabels(inptList, mrl);
+        mrl.setOnTouchListener(new OnSwipeTouchListener(MainActivity.this) {
+            @Override
+            public void onSwipeUp() {
+                super.onSwipeUp();
+                level--;
+                if (level <-1){
+                    level = 2;
+                }
+                showViews(level);
+            }
+
+            @Override
+            public void onSwipeDown() {
+                super.onSwipeDown();
+                level++;
+                if (level > 2){
+                    level = -1;
+                }
+                showViews(level);
+            }
+        });
     }
 
     public void showUG() {
         //String sets = req_from_server("Settings");
-        String inpts = req_from_server("Inputs_hks");
+        //String inpts = req_from_server("Inputs_hks");
         setContentView(R.layout.untergeschoss);
         level = -1;
         RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayoutUG);
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
         Boolean devel = prefs.getBoolean("checkbox_pref_devel", true);
 
-        final ButtonFeatures[] inptList = new ButtonFeatures[6];
+        final ButtonFeatures[] inptList = new ButtonFeatures[11];
         inptList[0] = new ButtonFeatures("Vm1ZIM1RUM1TE01", "Vm1ZIM1RUM1TE01", "Vm1ZIM1RUM1TE01", 600, 400, "°C");
         inptList[1] = new ButtonFeatures("Vm1ZIM1PFL1TE01", "Vm1ZIM1PFL1TE01", "Vm1ZIM1PFL1TE01", 300, 300, "°C");
         inptList[2] = new ButtonFeatures("Vm1ZIM1RUM1BA01", "Vm1ZIM1RUM1BA01", "Vm1ZIM1RUM1BA01", 600, 450, " mbar");
-        inptList[3] = new ButtonFeatures("Vm1ZIM3RUM1TE01", "Vm1ZIM3RUM1TE01", "Vm1ZIM3RUM1TE01", 800, 1100, "°C");
-        inptList[4] = new ButtonFeatures("Vm1ZIM2RUM1TE01", "Vm1ZIM2RUM1TE01", "Vm1ZIM2RUM1TE01", 300, 1100, "°C");
-        inptList[5] = new ButtonFeatures("Vm1ZIM2RUM1HU01", "Vm1ZIM2RUM1HU01", "Vm1ZIM2RUM1HU01", 300, 1150, "%");
+        inptList[3] = new ButtonFeatures("Vm1ZIM1RUM1VO01", "Vm1ZIM1RUM1VO01", "Vm1ZIM1RUM1VO01", 600, 500, "V");
+        inptList[4] = new ButtonFeatures("Vm1ZIM1RUM1CU01", "Vm1ZIM1RUM1CU01", "Vm1ZIM1RUM1CU01", 600, 550, "mA");
+
+        inptList[5] = new ButtonFeatures("Vm1ZIM2RUM1TE01", "Vm1ZIM2RUM1TE01", "Vm1ZIM2RUM1TE01", 300, 1100, "°C");
+        inptList[6] = new ButtonFeatures("Vm1ZIM2RUM1HU01", "Vm1ZIM2RUM1HU01", "Vm1ZIM2RUM1HU01", 300, 1150, "%");
+        inptList[7] = new ButtonFeatures("Vm1ZIM2RUM1TE02", "Vm1ZIM2RUM1TE02", "Vm1ZIM2RUM1TE02", 300, 1300, "°C");
+
+        inptList[8] = new ButtonFeatures("Vm1ZIM3RUM1TE01", "Vm1ZIM3RUM1TE01", "Vm1ZIM3RUM1TE01", 800, 1100, "°C");
+        inptList[9] = new ButtonFeatures("Vm1ZIM3RUM1TE02", "Vm1ZIM3RUM1TE02", "Vm1ZIM3RUM1TE02", 800, 1150, "°C");
+        inptList[10] = new ButtonFeatures("Vm1ZIM3RUM1TE03", "Vm1ZIM3RUM1TE03", "Vm1ZIM3RUM1TE03", 800, 1250, "°C");
         setInptLabels(inptList, mrl);
 
         Boolean rec_mes = prefs.getBoolean("checkbox_pref_showtaskmess", true);
+        final Boolean task = prefs.getBoolean("checkbox_pref_task", true);
         if (rec_mes){
             final Button but = new Button(this);
             RelativeLayout.LayoutParams rlt = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
@@ -498,17 +794,72 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View v) {
                 //if ( TaskerIntent.testStatus( this ).equals( TaskerIntent.Status.OK ) ) {
                     TaskerIntent i = new TaskerIntent( "Test" );
-                    sendBroadcast( i );
+                    if (task) {
+                        sendBroadcast(i);
+                    }
                 //}
             }
             });
             mrl.addView(but);
         }
+        mrl.setOnTouchListener(new OnSwipeTouchListener(MainActivity.this) {
+            @Override
+            public void onSwipeUp() {
+                super.onSwipeUp();
+                level--;
+                if (level <-1){
+                    level = 2;
+                }
+                showViews(level);
+            }
+
+            @Override
+            public void onSwipeDown() {
+                super.onSwipeDown();
+                level++;
+                if (level > 2){
+                    level = -1;
+                }
+                showViews(level);
+            }
+        });
 
     }
-    public void subscribeToTopic(){
+
+    public void showNachrichten() {
+        level = 3;
+        setContentView(R.layout.notifications);
+
+        lvItems = (ListView) findViewById(R.id.lvItems);
+        //items = new ArrayList<String>();
+        itemsAdapter = new ArrayAdapter<String>(this,
+                android.R.layout.simple_list_item_1, messages);
+        lvItems.setAdapter(itemsAdapter);
+        //items.add("First Item");
+        //items.add("Second Item");
+        setupListViewListener();
+    }
+
+    private void setupListViewListener() {
+        lvItems.setOnItemLongClickListener(
+                new AdapterView.OnItemLongClickListener() {
+                    @Override
+                    public boolean onItemLongClick(AdapterView<?> adapter,
+                                                   View item, int pos, long id) {
+                        // Remove the item within array at position
+                        messages.remove(pos);
+                        // Refresh the adapter
+                        itemsAdapter.notifyDataSetChanged();
+                        // Return true consumes the long click event (marks it handled)
+                        return true;
+                    }
+
+                });
+    }
+
+    public void subscribeToTopic(String topic){
         try {
-            mqttAndroidClient.subscribe("AES/Prio1", 1, null, new IMqttActionListener() {
+            mqttAndroidClient.subscribe(topic, 1, null, new IMqttActionListener() {
                 @Override
                 public void onSuccess(IMqttToken asyncActionToken) {
                     addToHistory("Subscribed!");
@@ -520,19 +871,34 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
 
-            // THIS DOES NOT WORK!
-            mqttAndroidClient.subscribe("AES/Prio1", 0, new IMqttMessageListener() {
-                @Override
-                public void messageArrived(String topic, MqttMessage message) throws Exception {
-                    // message Arrived!
-                    System.out.println("Message: " + topic + " : " + new String(message.getPayload()));
-                }
-            });
 
         } catch (MqttException ex){
             System.err.println("Exception whilst subscribing");
             ex.printStackTrace();
-        }
+        } catch (Exception e){
+
+        }}
+
+    public void unSubscribe(@NonNull final String topic) {
+        try{
+        IMqttToken token = mqttAndroidClient.unsubscribe(topic);
+        token.setActionCallback(new IMqttActionListener() {
+            @Override
+            public void onSuccess(IMqttToken iMqttToken) {
+                Log.d(TAG, "UnSubscribe Successfully " + topic);
+            }
+
+            @Override
+            public void onFailure(IMqttToken iMqttToken, Throwable throwable) {
+                Log.e(TAG, "UnSubscribe Failed " + topic);
+            }
+        } );}
+        catch (MqttException ex){
+                System.err.println("Exception whilst unsubscribing");
+                ex.printStackTrace();
+        } catch (Exception e){
+
+        };
     }
 
     private void addToHistory(String mainText){
@@ -540,107 +906,55 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    /**
-     * Gets the current registration ID for application on GCM service, if there is one.
-     * <p>
-     * If result is empty, the app needs to register.
-     *
-     * @return registration ID, or empty string if there is no existing
-     *         registration ID.
-     */
-    String getRegistrationId(Context context) {
-        final SharedPreferences prefs = getGcmPreferences(context);
-        String registrationId = prefs.getString(PROPERTY_REG_ID, "");
-        if (registrationId.isEmpty()) {
-            Log.i(TAG, "Registration not found.");
-            return "";
-        }
-        // Check if app was updated; if so, it must clear the registration ID
-        // since the existing regID is not guaranteed to work with the new
-        // app version.
-        int registeredVersion = prefs.getInt(PROPERTY_APP_VERSION, Integer.MIN_VALUE);
-        int currentVersion = getAppVersion(context);
-        if (registeredVersion != currentVersion) {
-            Log.i(TAG, "App version changed.");
-            return "";
-        }
-        return registrationId;
-    }
-
-    /**
-     * @return Application's version code from the {@code PackageManager}.
-     */
-    static int getAppVersion(Context context) {
+    private void sendNotification(String titel, String msg, Boolean retained) {
+        //PowerManager pm = (PowerManager) MainActivity.getApplicationContext().getSystemService(Context.POWER_SERVICE);
+        //pm.wakeUp(SystemClock.uptimeMillis());
+        String ts = "";
+        String desc = "";
+        String titelm = titel;
         try {
-            PackageInfo packageInfo = context.getPackageManager()
-                    .getPackageInfo(context.getPackageName(), 0);
-            return packageInfo.versionCode;
-        } catch (PackageManager.NameNotFoundException e) {
-            // should never happen
-            throw new RuntimeException("Could not get package name: " + e);
+            JSONObject jInpts = new JSONObject(msg);
+            ts = jInpts.optString("ts").toString();
+            desc = jInpts.optString("message").toString();
+            titelm = jInpts.optString("titel").toString();
+
+        } catch (JSONException e) {
+
         }
-    }
-    /**
-     * @return Application's {@code SharedPreferences}.
-     */
-    private SharedPreferences getGcmPreferences(Context context) {
-        // This sample app persists the registration ID in shared preferences, but
-        // how you store the regID in your app is up to you.
-        //here crashes
-        return getSharedPreferences(MainActivity.class.getSimpleName(),
-                Context.MODE_PRIVATE);
-    }
-
-    /**
-     * Stores the registration ID and the app versionCode in the application's
-     * {@code SharedPreferences}.
-     *
-     * @param context application's context.
-     * @param regId registration ID
-     */
-    private void storeRegistrationId(Context context, String regId) {
-        final SharedPreferences prefs = getGcmPreferences(context);
-        int appVersion = getAppVersion(context);
-        Log.i(TAG, "Saving regId on app version " + appVersion);
-        SharedPreferences.Editor editor = prefs.edit();
-        editor.putString(PROPERTY_REG_ID, regId);
-        editor.putInt(PROPERTY_APP_VERSION, appVersion);
-        editor.commit();
-    }
-
-    /**
-     * Registers the application with GCM servers asynchronously.
-     * <p>
-     * Stores the registration ID and the app versionCode in the application's
-     * shared preferences.
-     */
-
-    /**
-     * Sends the registration ID to your server over HTTP, so it can use GCM/HTTP or CCS to send
-     * messages to your app. Not needed for this demo since the device sends upstream messages
-     * to a server that echoes back the message using the 'from' address in the message.
-     */
-    public void sendRegistrationIdToBackend(String regid) {
-        String android_id = Settings.Secure.getString(getBaseContext().getContentResolver(),
-                Settings.Secure.ANDROID_ID);
-
+        Date date = new Date(0);
+        DateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
+        try {
+            date = format.parse(ts);
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
+        Date jetzt = new Date();
+        String body = ts + ", " + titelm + ": " + desc;
+        long diff = jetzt.getTime() - date.getTime();
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
-        String User_name = prefs.getString("User_name", "");
-        if (User_name.equals("")){
-            startActivity(new Intent(this, EinstellungenActivity.class));
-            prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
-            User_name = prefs.getString("@string/preference_name_key", "");
+        Boolean mess = prefs.getBoolean("checkbox_pref_mes", true);
+        Boolean task = prefs.getBoolean("checkbox_pref_task", true);
+        Boolean tasdeb = prefs.getBoolean("checkbox_pref_showtaskmess", true);
+        if (titelm.toLowerCase().contains("Setting".toLowerCase()) & task){
+            TaskerIntent i = new TaskerIntent( desc);
+            sendBroadcast( i );
         }
+        if ((diff < (1000*60*30) | !retained) & mess & (!task | tasdeb)) {
+            mNotificationManager = (NotificationManager)
+                    this.getSystemService(Context.NOTIFICATION_SERVICE);
+            PendingIntent contentIntent = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class), PendingIntent.FLAG_CANCEL_CURRENT);
+            NotificationCompat.Builder mBuilder =
+                    new NotificationCompat.Builder(this)
+                            .setSmallIcon(R.mipmap.steuerzen_icon)
+                            .setContentTitle(titelm)
+                            .setStyle(new NotificationCompat.BigTextStyle()
+                                    .bigText(body))
+                            .setContentText(body);
 
-        String msg = "{'GCM-Client':'";
-        String ende = "'}";
-        //send_to_server(msg + android_id + ende);
-        msg = "{'Android_id':'" + android_id;
-        msg = msg + "', 'Name':'" + User_name;
-        msg = msg + "', 'Reg_id':'" + regid;
-        ende = "'}";
-        //Toast.makeText(this, "Register with Server.", Toast.LENGTH_SHORT).show();
-        send_to_server(msg + ende);
+            mBuilder.setContentIntent(contentIntent);
+            mNotificationManager.notify(NOTIFICATION_ID, mBuilder.build());
+            NOTIFICATION_ID++;
+        }
     }
 
     public void send_to_server(String Befehl){
