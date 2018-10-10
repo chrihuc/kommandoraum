@@ -4,6 +4,9 @@
     <uses-sdk
         android:minSdkVersion="23"
         android:targetSdkVersion="23" />
+    <!-- Permissions required to receive BOOT_COMPLETED event -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <uses-permission android:name="android.permission.INTERNET"/>
     <permission android:name="com.asuscomm.chrihuc.schaltzentrale.permission.C2D_MESSAGE" android:protectionLevel="signature"/>
     <uses-permission android:name="net.dinglisch.android.tasker.PERMISSION_RUN_TASKS"/>

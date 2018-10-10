@@ -173,7 +173,7 @@ public class TaskerIntent extends Intent {
     // use *before* sending an intent
     // still need to test the *result after* sending intent
 
-    public static Status testStatus( Context c ) {
+    public static Status testStatus( Context c, String TaskName ) {
 
         Status result;
 
@@ -185,7 +185,7 @@ public class TaskerIntent extends Intent {
             result = Status.NotEnabled;
         else if ( ! TaskerIntent.prefSet( c, PROVIDER_COL_NAME_EXTERNAL_ACCESS ) )
             result = Status.AccessBlocked;
-        else if ( ! new TaskerIntent( "" ).receiverExists( c ) )
+        else if ( ! new TaskerIntent( TaskName ).receiverExists( c ) )
             result = Status.NoReceiver;
         else
             result = Status.OK;
