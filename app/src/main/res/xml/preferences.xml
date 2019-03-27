@@ -31,6 +31,18 @@
         android:defaultValue="@string/preference_name_default"
         android:inputType="textMultiLine" />
 
+    <EditTextPreference
+        android:title="Home Wifi"
+        android:key="homeWifi"
+        android:defaultValue="@string/preference_homeWifi_default"
+        android:inputType="textMultiLine" />
+
+    <CheckBoxPreference
+        android:key="cb_ring_nachts"
+        android:title="Türklingel Nachts"
+        android:summary="Türklingel nachts nicht stumm"
+        android:defaultValue="true" />
+
     <CheckBoxPreference
         android:key="checkbox_pref_mes"
         android:title="@string/preference_rec_mes_title"
@@ -44,14 +56,26 @@
         android:defaultValue="true" />
 
     <CheckBoxPreference
+        android:key="checkbox_pref_tuerspimess"
+        android:title="TürSpion SMS"
+        android:summary="Bilder als extra Nachrichten"
+        android:defaultValue="false" />
+
+    <CheckBoxPreference
         android:key="checkbox_pref_showtaskmess"
         android:title="Zeige Tasker Nachricht"
-        android:summary="Debug"
+        android:summary="Befehle nicht stumm ausführen"
         android:defaultValue="false" />
 
     <CheckBoxPreference
         android:key="checkbox_pref_devel"
         android:title="Zeige Entwickler Werte"
+        android:summary="Debug"
+        android:defaultValue="false" />
+
+    <CheckBoxPreference
+        android:key="checkbox_mess_devel"
+        android:title="Zeige Entwickler Nachrichten"
         android:summary="Debug"
         android:defaultValue="false" />
 

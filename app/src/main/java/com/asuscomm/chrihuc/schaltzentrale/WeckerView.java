@@ -58,7 +58,9 @@ public class WeckerView {
         liste[10] = new WeckerListe( "Audio", false);
 
         // list received not json object
-        JSONArray jArr = new JSONArray(setWeckers);
+        JSONObject jMqtt = new JSONObject(setWeckers);
+        String jValue = jMqtt.optString("payload").toString();
+        JSONArray jArr = new JSONArray(jMqtt.optString("payload"));
         //JSONArray jsonMainNode = jObject.optJSONArray("Wecker");
         final int lengthJsonArr = jArr.length();
         //String Name = jObject.getString("Name");
@@ -267,16 +269,17 @@ public class WeckerView {
     }
 
     public String send_wecker_to_server(String Befehl){
-        try {
-            String msg = "{'GCM-Client':'";
-            msg = "{'SetWecker':'" + Befehl;
-            msg = msg +  "'}";
-            String antwort = SocketClient.request(msg);
-            return antwort;
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
+//        try {
+//            String msg = "{'GCM-Client':'";
+            String msg = "{\"payload\":" + Befehl +"}";
+//            msg = msg +  "'}";
+            MqttConnectionManagerService.send_mqtt_serv("DataRequest/SetTable/Wecker",msg);
+//            String antwort = SocketClient.request(msg);
+//            return antwort;
+//        } catch (IOException e) {
+//            // TODO Auto-generated catch block
+//            e.printStackTrace();
+//        }
         return "";
     }
 

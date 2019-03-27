@@ -10,6 +10,7 @@
     <string name="preference_rec_mes_summ">Zeigt Nachrichten vom Haus</string>
     <string name="preference_rec_tasks_title">Empfange Tasks</string>
     <string name="preference_rec_tasks_sum">Empfängt und führt Actionen aus</string>
+    <string name="preference_homeWifi_default" />
 
 
 </resources>
