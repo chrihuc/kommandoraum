@@ -308,13 +308,20 @@ public class MQTTReceiver extends IntentService {
         @Override
         public void onReceive(Context context, Intent intent) {
             String message = intent.getStringExtra("message");
-            if (message.equals("ScreenOff")) {
-                unSubscribe("Inputs/HKS/#");
-                unSubscribe("Settings/#");
-            } else if (message.equals("ScreenOn")) {
-                subscribeToTopic("Inputs/HKS/#");
+            final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+            Boolean powersave = prefs.getBoolean("cp_powersave", true);
+            if (powersave) {
+                if (message.equals("ScreenOff")) {
+                    unSubscribe("Inputs/HKS/#");
+                    unSubscribe("Settings/#");
+                } else if (message.equals("ScreenOn")) {
+                    subscribeToTopic("Inputs/HKS/#");
 //                subscribeToTopic("Inputs/A00#");
-                subscribeToTopic("Settings/#");
+                    subscribeToTopic("Settings/#");
+                }
+//            } else{
+//                subscribeToTopic("Inputs/HKS/#");
+//                subscribeToTopic("Settings/#");
             }
         }
     };

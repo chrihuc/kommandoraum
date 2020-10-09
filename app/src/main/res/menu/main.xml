@@ -4,11 +4,11 @@
     <!--<item android:id="@+id/og" android:orderInCategory="100" android:title="Obergeschoss"></item>-->
     <!--<item android:id="@+id/eg" android:orderInCategory="100" android:title="Erdgeschoss"></item>-->
     <!--<item android:id="@+id/ug" android:orderInCategory="100" android:title="Keller"></item>-->
-    <item android:id="@+id/wecker" android:orderInCategory="100" android:title="Wecker"></item>
-    <item android:id="@+id/schaltuhr" android:orderInCategory="100" android:title="Schaltuhr"></item>
-    <item android:id="@+id/notifications" android:orderInCategory="100" android:title="Nachrichten"></item>
+<!--    <item android:id="@+id/wecker" android:orderInCategory="100" android:title="Wecker"></item>-->
+<!--    <item android:id="@+id/schaltuhr" android:orderInCategory="100" android:title="Schaltuhr"></item>-->
+<!--    <item android:id="@+id/notifications" android:orderInCategory="100" android:title="Nachrichten"></item>-->
     <!--<item android:id="@+id/tuerspion" android:orderInCategory="100" android:title="Tür Spion"></item>-->
-    <item android:id="@+id/settings" android:orderInCategory="100" android:title="App Settings"></item>
+<!--    <item android:id="@+id/settings" android:orderInCategory="100" android:title="App Settings"></item>-->
     <item android:id="@+id/szsettings" android:orderInCategory="100" android:title="Haus Settings"></item>
     <!--<item android:id="@+id/szenen" android:orderInCategory="100" android:title="Haus Szenen"></item>-->
 </menu>

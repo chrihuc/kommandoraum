@@ -8,4 +8,13 @@
     android:background="@drawable/ug"
     android:id="@+id/relLayoutUG" >
 
+    <Button
+        android:id="@+id/button2"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentStart="true"
+        android:visibility="gone"
+        android:text="Button" />
+    <!--android:visibility="gone"-->
 </RelativeLayout>

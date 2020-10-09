@@ -1,7 +1,13 @@
 package com.asuscomm.chrihuc.schaltzentrale;
 
 import android.app.Activity;
+import android.content.SharedPreferences;
+import android.os.Build;
+import android.preference.PreferenceManager;
+import android.text.Editable;
 import android.text.InputType;
+import android.text.TextUtils;
+import android.text.TextWatcher;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -25,7 +31,7 @@ public class SettingsView {
     }
     //@SuppressWarnings("unused")
     //@Override
-    public void settings_show(String szSettings) throws JSONException {
+    public void settings_show(String szSettings, Boolean alleSettings) throws JSONException {
 
         int x1 = 1000;
         int x2 = 1000;
@@ -51,6 +57,8 @@ public class SettingsView {
         sv.addView(ll);
         RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
 
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this.activity.getApplicationContext());
+        String mqttId = prefs.getString("mqttId", "");
 
         for (int i = 0; i < lengthJsonArr; i++) {
             JSONObject jsonChildNode = jArr.getJSONObject(i);
@@ -59,9 +67,11 @@ public class SettingsView {
             String Value = jsonChildNode.optString("Value").toString();
             final String execSzene = jsonChildNode.optString("execSzene").toString();
             String inApp = jsonChildNode.optString("inApp").toString();
-            String Typ = jsonChildNode.optString("Typ").toString();
-            if (inApp.equals("True")){
-                RelativeLayout row = new RelativeLayout(this.activity);
+            final String Typ = jsonChildNode.optString("Typ").toString();
+            final String Users = jsonChildNode.optString("Users").toString();
+            if ((alleSettings && ! Typ.equals("null")) || (inApp.equals("True") && (Users.equals("") || Users.contains(mqttId)))){
+//            if (inApp.equals("True")){
+                final RelativeLayout row = new RelativeLayout(this.activity);
                 //row.setOrientation(2);
                 row.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
                 TextView t = new TextView(this.activity);
@@ -91,6 +101,7 @@ public class SettingsView {
                                      json.put("Value", "False");
                                  }
                                  MqttConnectionManagerService.send_mqtt_serv("DataRequest/SetSettings/",json.toString());
+                                 MqttConnectionManagerService.send_mqtt_serv("Command/Szene/" + execSzene, "{\"Szene\":\"" + execSzene + "\"}");
                              } catch (JSONException e) {
                                  e.printStackTrace();
                              }
@@ -103,6 +114,60 @@ public class SettingsView {
                     et.setInputType(InputType.TYPE_NUMBER_FLAG_DECIMAL);
                     et.setText(Value);
                     et.setLayoutParams(params);
+                    TextWatcher watcher = new TextWatcher() {
+
+                        @Override
+                        public void onTextChanged(CharSequence s, int start, int before, int count) {
+
+                        }
+
+                        @Override
+                        public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+
+                        @Override
+                        public void afterTextChanged(Editable s) {
+                            JSONObject json = new JSONObject();
+                            try {
+                                json.put("Name", Name);
+//                                json.put("Value", newvalInt.toString());
+                                json.put("Value", s);
+                                MqttConnectionManagerService.send_mqtt_serv("DataRequest/SetSettings/",json.toString());
+                                MqttConnectionManagerService.send_mqtt_serv("Command/Szene/" + execSzene, "{\"Szene\":\"" + execSzene + "\"}");
+                            } catch (JSONException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    };
+                    et.addTextChangedListener(watcher);
+                    row.addView(et);
+                } else if (Typ.contains("string")){
+                    EditText et = new EditText(this.activity);
+                    et.setText(Value);
+                    TextWatcher watcher = new TextWatcher() {
+
+                        @Override
+                        public void onTextChanged(CharSequence s, int start, int before, int count) {
+
+                        }
+
+                        @Override
+                        public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+
+                        @Override
+                        public void afterTextChanged(Editable s) {
+                            JSONObject json = new JSONObject();
+                            try {
+                                json.put("Name", Name);
+//                                json.put("Value", newvalInt.toString());
+                                json.put("Value", s);
+                                MqttConnectionManagerService.send_mqtt_serv("DataRequest/SetSettings/",json.toString());
+                                MqttConnectionManagerService.send_mqtt_serv("Command/Szene/" + execSzene, "{\"Szene\":\"" + execSzene + "\"}");
+                            } catch (JSONException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    };
+                    et.addTextChangedListener(watcher);
                     row.addView(et);
                 } else if (Typ.contains("list")){
                     Float valFloat = Float.parseFloat(Value);
@@ -110,20 +175,28 @@ public class SettingsView {
                     final Float min = Float.parseFloat(separated[1]);
                     final Float max = Float.parseFloat(separated[2]);
                     Integer pos = Math.round(100 * (valFloat-min)/(max-min));
-                    SeekBar sBar = new SeekBar(this.activity);
-                    sBar.setMin(0);
+                    final TextView t2 = new TextView(this.activity);
+                    int minutes = valFloat.intValue() / 60;
+                    int secs    = valFloat.intValue() % 60;
+                    String value = String.format("%d min, %d sec", minutes, secs);
+                    final SeekBar sBar = new SeekBar(this.activity);
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        sBar.setMin(0);
+                    }
                     sBar.setMax(100);
                     sBar.setProgress(pos);
-                    SeekBar.OnSeekBarChangeListener abc = new SeekBar.OnSeekBarChangeListener() {
+                    final SeekBar.OnSeekBarChangeListener abc = new SeekBar.OnSeekBarChangeListener() {
 
                         @Override
                         public void onStopTrackingTouch(SeekBar seekBar) {
                             int progress = seekBar.getProgress();
                             Double newvalFloat = progress / 100.0 *(max - min) + min;
+                            Integer newvalInt = newvalFloat.intValue();
                             JSONObject json = new JSONObject();
                             try {
                                 json.put("Name", Name);
-                                json.put("Value", newvalFloat.toString());
+//                                json.put("Value", newvalInt.toString());
+                                json.put("Value", String.format("%.1f", newvalFloat));
                                 MqttConnectionManagerService.send_mqtt_serv("DataRequest/SetSettings/",json.toString());
                                 MqttConnectionManagerService.send_mqtt_serv("Command/Szene/" + execSzene, "{\"Szene\":\"" + execSzene + "\"}");
                             } catch (JSONException e) {
@@ -139,12 +212,32 @@ public class SettingsView {
                         public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                             //Executed when progress is changed
 //                            System.out.println(progress);
+                            Double newvalFloat = progress / 100.0 *(max - min) + min;
+                            Integer newvalInt = newvalFloat.intValue();
+                            int minutes = newvalInt / 60;
+                            int secs    = newvalInt % 60;
+                            String timeCount = String.format("%d min, %d sec", minutes, secs);
+                            if (Typ.contains("timer")) {
+                                t2.setText(timeCount);
+                            }
+                            if (Typ.contains("value")){
+                                t2.setText(String.format("%.1f", newvalFloat));
+                            }
                         }
                     };
                     sBar.setOnSeekBarChangeListener(abc);
                     sBar.setLayoutParams(params);
 
 //                    LinearLayout.LayoutParams sBarLayParams=new LayoutParams(LayoutParams.FILL_PARENT, LayoutParams.WRAP_CONTENT);
+                    t2.setLayoutParams(params);
+                    if (Typ.contains("timer")){
+                        t2.setText(value);
+                        row.addView(t2);
+                    }
+                    if (Typ.contains("value")){
+                        t2.setText(valFloat.toString());
+                        row.addView(t2);
+                    }
                     row.addView(sBar);
                 }
                 ll.addView(row);

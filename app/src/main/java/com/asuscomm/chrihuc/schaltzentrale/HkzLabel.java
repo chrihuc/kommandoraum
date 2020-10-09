@@ -9,8 +9,9 @@ public class HkzLabel {
     Integer level;
     String text;
     Boolean devel;
+    Boolean enabled;
 
-    public HkzLabel (String Name, Integer x_value, Integer y_value, String unit, Integer id, Integer level, String text, Boolean devel)
+    public HkzLabel (String Name, Integer x_value, Integer y_value, String unit, Integer id, Integer level, String text, Boolean devel, Boolean enabled)
     {
         this.Name = Name;
         this.x_value = x_value;
@@ -20,6 +21,7 @@ public class HkzLabel {
         this.level = level;
         this.text = text;
         this.devel = devel;
+        this.enabled = enabled;
     }
     public Integer getLevelbyName(String Name, HkzLabel args[])
     {

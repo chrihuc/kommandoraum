@@ -6,6 +6,8 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -14,20 +16,30 @@ import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
+import android.graphics.PixelFormat;
 import android.media.AudioAttributes;
+import android.media.AudioManager;
+import android.media.MediaPlayer;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.net.wifi.WifiManager;
+import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 import android.preference.PreferenceManager;
+import android.provider.AlarmClock;
 import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.NotificationCompat;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.widget.Toast;
 
 import org.eclipse.paho.android.service.MqttAndroidClient;
@@ -45,18 +57,21 @@ import org.json.JSONObject;
 
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
+import java.util.Random;
 import java.util.TimeZone;
 import java.util.Timer;
 import java.util.TimerTask;
 
 import static java.lang.Thread.activeCount;
 import static java.lang.Thread.sleep;
+import static java.security.AccessController.getContext;
 
 public class MqttConnectionManagerService extends Service {
 
@@ -66,9 +81,16 @@ public class MqttConnectionManagerService extends Service {
     public static int NOTIFICATION_ID = 1;
     public Date connectDate = new Date();
     public Date conLostDate = new Date();
+    public Boolean connected = false;
+    public Boolean connectionLost = false;
+    public Boolean connectionLosts = false;
+    public Boolean timeRunning = false;
     public Boolean timerSet = false;
     private static final String NOTIFICATION_CHANNEL_ID = "MyChannel2";
+    private MediaPlayer mp;
     Context context;
+    WifiReceiver wifiReceiver= new WifiReceiver();
+    Random generator = new Random();
 
     @Override
     public void onCreate() {
@@ -86,6 +108,18 @@ public class MqttConnectionManagerService extends Service {
             Toast.makeText(getBaseContext(), "Konnte MQTT service nicht starten.", Toast.LENGTH_LONG).show();
         }
 
+        IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(WifiManager.SUPPLICANT_CONNECTION_CHANGE_ACTION);
+        intentFilter.addAction(WifiManager.SUPPLICANT_STATE_CHANGED_ACTION);
+        intentFilter.addAction(WifiManager.WIFI_STATE_CHANGED_ACTION);
+        registerReceiver(wifiReceiver, intentFilter);
+
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(BluetoothDevice.ACTION_ACL_CONNECTED);
+        filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECT_REQUESTED);
+        filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
+        this.registerReceiver(mReceiver, filter);
+
     }
 
     public int picNr = 1;
@@ -99,6 +133,16 @@ public class MqttConnectionManagerService extends Service {
         String mqttPort = prefs.getString("mqttPort", "");
         String mqttUser = prefs.getString("mqttUser", "");
         String mqttPass = prefs.getString("mqttPass", "");
+
+        try {
+            String userID = intent.getStringExtra("execVoid");
+            if (userID != null && userID.equals("stopWecker")) {
+                stopPlaying();
+            }
+        }catch (Exception e){
+
+        }
+
 
         if (clientId.equals(new String()) || (mqttPort.equals(new String())) || (mqttServer.equals(new String()))
                 || (mqttUser.equals(new String())) || (mqttPass.equals(new String()))){
@@ -154,6 +198,8 @@ public class MqttConnectionManagerService extends Service {
 
         final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
         final String clientId = prefs.getString("mqttId", "");
+        final Boolean devel = prefs.getBoolean("checkbox_mess_devel", false);
+        final Handler timehandler = new Handler();
 
         try {
             if (!client.isConnected()) {
@@ -171,6 +217,9 @@ public class MqttConnectionManagerService extends Service {
                         //subscribeToTopic("Inputs/#");
                         subscribeToTopic("Message/" + clientId);
                         subscribeToTopic("Image/Satellite/#");
+                        if (devel){
+                            subscribeToTopic("Time");
+                        }
                         addToHistory("Client as service connected");
 //                        Toast.makeText(getBaseContext(), "Connected to MQTT as Service", Toast.LENGTH_SHORT).show();
                     }
@@ -184,38 +233,80 @@ public class MqttConnectionManagerService extends Service {
                     @Override
                     public void connectComplete(boolean reconnect, String serverURI) {
                         connectDate = new Date();
+                        connected = true;
                         if (reconnect) {
                             addToHistory("Client reconnected");
                         } else{
                             addToHistory("Normal connection");
                         }
                         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
-                        Boolean devel = prefs.getBoolean("checkbox_mess_devel", true);
-                        if (devel){
-                            makeNotification("Connected", "Connected", 2);
+//                        Boolean devel = prefs.getBoolean("checkbox_mess_devel", true);
+                        if (devel && connectionLosts){
+                            makeNotification("Connected", "Developer Verbindung wieder hergestellt", 2, "");
                         }
+                        if (connectionLost){
+                            makeNotification("MQTT", "Verbindung nach Hause wieder hergestellt", 2, "");
+                        }
+                        connectionLost = false;
+                        connectionLosts = false;
                         subscribeToTopic("Message/" + clientId);
                         subscribeToTopic("Image/Satellite/#");
+                        if (devel){
+                            subscribeToTopic("Time");
+                        }
                     }
 
                     @Override
                     public void connectionLost(Throwable cause) {
                         conLostDate = new Date();
+                        connected = false;
                         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
                         Boolean devel = prefs.getBoolean("checkbox_mess_devel", true);
                         if (devel){
-                            makeNotification("Connection lost", "Connection lost", 2);
+                            final Handler handler1 = new Handler();
+                            handler1.postDelayed(new Runnable() {
+                                @Override
+                                public void run() {
+                                    if (!connected){
+                                        makeNotification("Achtung", "Verbindung nach Hause seit 20sec verloren", 2, "");
+                                        connectionLosts = true;
+                                    }
+                                }
+                            }, 20000);
                         }
                         addToHistory("Connection lost");
+                        final Handler handler = new Handler();
+                        handler.postDelayed(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (!connected){
+                                    makeNotification("Achtung", "Verbindung nach Hause seit 5min verloren", 2, "");
+                                    connectionLost = true;
+                                }
+                            }
+                        }, 300000);
                     }
 
                     @Override
                     public void messageArrived(String topic, MqttMessage message) throws Exception {
                         if (topic.toLowerCase().contains("Message".toLowerCase())){
                             sendNotification(new String(message.getPayload()), message.isRetained());
-                            addToHistory("Notification received " + message.toString() );
+//                            addToHistory("Notification received " + message.toString() );
                         } else if (topic.toLowerCase().contains("Image".toLowerCase())) {
                             showPic(message);
+                        } else if (topic.equals("Time")){
+                            if (! timeRunning){
+                                makeNotification("Hinweis", "Zeit empfangen, überwachung läuft", 2, "");
+                                timeRunning = true;
+                            }
+                            timehandler.removeCallbacksAndMessages(null);
+                            timehandler.postDelayed(new Runnable() {
+                                @Override
+                                public void run() {
+                                    timeRunning = false;
+                                    makeNotification("Achtung", "Steuerzentrale scheint nicht zu laufen", 2, "");
+                                }
+                            }, 3 * 60 * 1000);
                         }
                     }
 
@@ -228,7 +319,7 @@ public class MqttConnectionManagerService extends Service {
         } catch (MqttException e) {
             //handle e
             addToHistory("Crash on MqttException");
-            makeNotification("Crash", "in service", 2);
+            makeNotification("Crash", "in service", 2, "");
         }
     }
 
@@ -250,11 +341,11 @@ public class MqttConnectionManagerService extends Service {
         } catch (MqttException ex){
             System.err.println("Exception whilst subscribing");
             addToHistory("Error during subscribing");
-            makeNotification("Crash", "in service", 2);
+            makeNotification("Crash", "in service", 2, "");
             ex.printStackTrace();
         } catch (Exception e){
             addToHistory("Crash during subscribing");
-            makeNotification("Crash", "in service", 2);
+            makeNotification("Crash", "in service", 2, "");
         }}
 
     public void unSubscribe(@NonNull final String topic) {
@@ -286,6 +377,7 @@ public class MqttConnectionManagerService extends Service {
         String ts = "";
         String desc = "";
         String titelm = "";
+        String payload = "";
         Integer prio = 2;
 //        Double prio = 2.0;
         Integer Mins = 1000*60;
@@ -296,9 +388,10 @@ public class MqttConnectionManagerService extends Service {
             desc = jInpts.optString("message").toString();
             titelm = jInpts.optString("titel").toString();
             prio = jInpts.optInt("prio");
+            payload = jInpts.optString("payload");
 
         } catch (JSONException e) {
-            makeNotification("Crash", "in service", prio);
+            makeNotification("Crash", "in service", prio, payload);
         }
         Date date = new Date(0);
         DateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
@@ -306,11 +399,14 @@ public class MqttConnectionManagerService extends Service {
             date = format.parse(ts);
         } catch (ParseException e) {
             e.printStackTrace();
-            makeNotification("Crash", "in service", prio);
+            makeNotification("Crash", "in service", prio, payload);
         }
 
         Date jetzt = new Date();
-        String body = ts + ", " + titelm + ": " + desc;
+        String body = "";
+        if (!desc.equals("")){
+            body = desc + ", " + ts ;
+        }
         long diff = jetzt.getTime() - date.getTime();
         boolean missedMess = (date.getTime() >= (conLostDate.getTime() - 30*Secs)) & (date.getTime() <= (connectDate.getTime() + 30*Secs));
         if (missedMess) {
@@ -320,45 +416,64 @@ public class MqttConnectionManagerService extends Service {
         Boolean mess = prefs.getBoolean("checkbox_pref_mes", true);
         Boolean task = prefs.getBoolean("checkbox_pref_task", true);
         Boolean tasdeb = prefs.getBoolean("checkbox_pref_showtaskmess", true);
-        if ((missedMess | !retained) & titelm.toLowerCase().contains("Setting".toLowerCase()) & task){
+        if ((missedMess | !retained) & titelm.toLowerCase().contains("DirektSetting".toLowerCase()) & task){
+            AudioManager manager = (AudioManager)getSystemService(Context.AUDIO_SERVICE);
+            manager.setStreamVolume(AudioManager.STREAM_NOTIFICATION, 10, 0);
+        }
+        else if ((missedMess | !retained) & titelm.toLowerCase().contains("Setting".toLowerCase()) & task){
             if ( TaskerIntent.testStatus( MqttConnectionManagerService.this, desc ).equals( TaskerIntent.Status.OK ) ) {
                 TaskerIntent i = new TaskerIntent( desc );
                 if (task) {
                     sendBroadcast(i);
+//                    if (desc.contains("Nacht")){
+//
+//                    }
                 }
             } else {
-                makeNotification("TaskerCon", "Failed", prio);
+                makeNotification("TaskerCon", "Failed", prio, payload);
             }
         }
         if ((missedMess | !retained) & mess & (!titelm.toLowerCase().contains("Setting".toLowerCase()) | tasdeb)) {
-            makeNotification(titelm, body, prio);
+            makeNotification(titelm, body, prio, payload);
             addToHistory("Nachricht ausgegeben (Service)");
         }
     }
 
-    private void makeNotification(String topic, String body, int prio){
+    void makeNotification(String topic, String body, int prio, String payload){
+        BluetoothAdapter mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         mNotificationManager = (NotificationManager)
                 this.getSystemService(Context.NOTIFICATION_SERVICE);
+
+
+
         PendingIntent contentIntent = PendingIntent.getActivity(this, NOTIFICATION_ID
                 , new Intent(this, NotificationActivity.class), PendingIntent.FLAG_UPDATE_CURRENT);
-        NotificationCompat.Builder mBuilder =
-                new NotificationCompat.Builder(this)
-                        .setSmallIcon(R.mipmap.steuerzen_icon)
-                        .setContentTitle(topic)
-                        .setStyle(new NotificationCompat.BigTextStyle()
-                                .bigText(body))
-                        .setContentText(body);
-        NotificationChannel notificationChannel = new NotificationChannel(NOTIFICATION_CHANNEL_ID, "My Notifications", NotificationManager.IMPORTANCE_HIGH);
+
+
+//        Intent i = new Intent("do_something");
+//        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 0, i, 0);
+
+//        NotificationManager notificationManager = (NotificationManager) getContext().getSystemService(Context.NOTIFICATION_SERVICE);
+
+
+
         // Configure the notification channel.
-        AudioAttributes att = new AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                .build();
+//        AudioAttributes att = new AudioAttributes.Builder()
+//                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+//                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+//                .build();
 //        Uri alarmSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
         Boolean kling_nachts = prefs.getBoolean("cb_ring_nachts", true);
+        Boolean stumm = prefs.getBoolean("cb_stumm", false);
+        Boolean alarm_immer = prefs.getBoolean("cb_alarm_imer", true);
+        Boolean tuer_immer = prefs.getBoolean("cb_ring_immer", true);
+        Boolean debug = prefs.getBoolean("checkbox_pref_devel",false);
+        Boolean vibr = prefs.getBoolean("cb_vibrate",false);
+        Integer tuer_vol = prefs.getInt("cb_ring_vol",10);
+        Integer alarm_vol = prefs.getInt("cb_alarm_vol",5);
         // nicht so ganz klar warum das funktioniert....
-        // dnd == 0 ist kein dnd
+        // dnd == 0 ist unbekannt, 1 == kein filter, 2 == priorität, 3 == gar nichts, 4 == Alarme
         // wir initialisieren dnd mit 1, also erstmal kein Ton
         // sind wir sicher, das der Ton eingeschaltet ist dann gibt das Ding laut
         // wenn es klingeln sollte dann intialisieren wir mit 0, also Ton
@@ -377,76 +492,428 @@ public class MqttConnectionManagerService extends Service {
 
         // neuer versuch mit:
         int dnd = mNotificationManager.getCurrentInterruptionFilter();
+        AudioManager manager = (AudioManager)getSystemService(Context.AUDIO_SERVICE);
+        int slent = manager.getRingerMode();
+        Integer cur_vol_not = manager.getStreamVolume(AudioManager.STREAM_NOTIFICATION);
+        Integer cur_vol_mus = manager.getStreamVolume(AudioManager.STREAM_MUSIC);
+        Integer cur_vol_sys = manager.getStreamVolume(AudioManager.STREAM_SYSTEM);
+        Integer cur_vol_rin = manager.getStreamVolume(AudioManager.STREAM_RING);
         // 1 alles
         // 2 Ausnahmen
         // 3 nicht
         // 4 alarme
-        if (prio == 5) {
-            try {
-                Uri notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.telephone);
-                Ringtone r = RingtoneManager.getRingtone(getApplicationContext(), notification);
-                if (dnd <= 1 || (dnd == 2 && kling_nachts)){
-                    r.play();
-                }else if (false){
-                    mNotificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALL);
-                    r.play();
-                    sleep(5000);
-                    mNotificationManager.setInterruptionFilter(dnd);
+        // dnd und mute ausschalten:
+        Integer muteoff = prio / 100;
+        prio = prio - muteoff * 100;
+        boolean tonaus = false;
+        boolean tonein = false;
+        boolean ton = true;
+        boolean wecker = false;
+
+
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Uri notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.sonar);
+
+            for (int i = 2; i < 20; i++) {
+                String NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_00";
+                String DESCRIPTION = "Prio 00";
+                switch (i) {
+                    case 2:
+                        notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.sonar);
+                        NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_00";
+                        DESCRIPTION = "Prio 00";
+                        break;
+                    case 3:
+                        notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.kill);
+                        NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_03";
+                        DESCRIPTION = "Prio 03";
+                        break;
+                    case 4:
+                        notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.ohpickme);
+                        NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_04";
+                        DESCRIPTION = "Prio 04";
+                        break;
+                    case 5:
+                        notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.dingdong);
+                        NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_05";
+                        DESCRIPTION = "Prio 05";
+                        break;
+                    case 6:
+                        notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.icquhoh);
+                        NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_06";
+                        DESCRIPTION = "Prio 06";
+                        break;
+                    case 7:
+                        notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.mute);
+                        NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_07";
+                        DESCRIPTION = "Prio 07";
+                        break;
+                    case 8:
+                        notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.sonar);
+                        NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_08";
+                        DESCRIPTION = "Prio 08";
+                        break;
+                    case 9:
+                        notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.sonar);
+                        NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_09";
+                        DESCRIPTION = "Prio 09";
+                        break;
+                    case 10:
+                        notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.countdown);
+                        NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_10";
+                        DESCRIPTION = "Prio 10";
+                        break;
+                    case 11:
+                        notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.countdownstart);
+                        NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_11";
+                        DESCRIPTION = "Prio 11";
+                        break;
+                    case 12:
+                        notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.burp);
+                        NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_12";
+                        DESCRIPTION = "Prio 12";
+                        break;
+                    case 13:
+                        notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.play);
+                        NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_13";
+                        DESCRIPTION = "Prio 13";
+                        break;
+                    case 14:
+                        notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.cookie);
+                        NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_14";
+                        DESCRIPTION = "Prio 14";
+                        break;
+                    case 15:
+                        notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.groot);
+                        NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_15";
+                        DESCRIPTION = "Prio 15";
+                        break;
+                    case 16:
+                        notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.whatwasthat);
+                        NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_16";
+                        DESCRIPTION = "Prio 16";
+                        break;
+                    case 17:
+                        notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.minions_yeah);
+                        NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_17";
+                        DESCRIPTION = "Prio 17";
+                        break;
+                    case 18:
+                        notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.papoi);
+                        NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_18";
+                        DESCRIPTION = "Prio 18";
+                        break;
+                    case 19:
+                        notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.suckers);
+                        NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_19";
+                        DESCRIPTION = "Prio 19";
+                        break;
                 }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        } else if (prio == 6) {
-            try {
-                Uri notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.bomb_siren);
-                Ringtone r = RingtoneManager.getRingtone(getApplicationContext(), notification);
-                mNotificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALL);
-                r.play();
-                sleep(5000);
-                mNotificationManager.setInterruptionFilter(dnd);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }else{
-            try {
-                Uri notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.sonar);
-                Ringtone r = RingtoneManager.getRingtone(getApplicationContext(), notification);
-                // alternative um die Lautstärke zu setzen:
-//                AudioManager manager = (AudioManager)getSystemService(Context.AUDIO_SERVICE);
-//                manager.setStreamVolume(AudioManager.STREAM_MUSIC, volume, 0);
-//
-//                Uri notification = RingtoneManager
-//                        .getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
-//
-//                MediaPlayer player = MediaPlayer.create(getApplicationContext(), notification);
-//                player.start();
-                if (dnd <= 1){
-                    r.play();
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
+                NotificationChannel notificationChannel = new NotificationChannel(NOTIFICATION_CHANNEL_ID, "Steuerzentrale Notifications", NotificationManager.IMPORTANCE_HIGH);
+
+                // Configure the notification channel.
+                //notificationChannel.setImportance(NotificationManager.IMPORTANCE_HIGH);
+                notificationChannel.setDescription(DESCRIPTION);
+                notificationChannel.enableLights(true);
+                notificationChannel.setLightColor(Color.YELLOW);
+                notificationChannel.setVibrationPattern(new long[] {2000});
+                notificationChannel.enableVibration(true);
+                AudioAttributes audioAttributes = new AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        .build();
+                notificationChannel.setSound(notification, audioAttributes);
+                mNotificationManager.createNotificationChannel(notificationChannel);
             }
         }
-//        notificationChannel.setSound(alarmSound,att);
-        notificationChannel.setDescription(body);
-        notificationChannel.enableLights(true);
-        notificationChannel.setLightColor(Color.RED);
-        notificationChannel.setVibrationPattern(new long[]{0, 1000, 500, 1000});
-        notificationChannel.enableVibration(true);
-        mNotificationManager.createNotificationChannel(notificationChannel);
-//        if (imageThumbnail != null) {
-//            mBuilder.setStyle(new Notification.BigPictureStyle()
-//                    .bigPicture(imageThumbnail).setSummaryText(messageBody));
-//        }
-        mBuilder.setAutoCancel(true);
-//        final Intent notificationIntent = new Intent(context, MainActivity.class);
-//        notificationIntent.setAction(Intent.ACTION_MAIN);
-//        notificationIntent.addCategory(Intent.CATEGORY_LAUNCHER);
-//        notificationIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        mBuilder.setContentIntent(contentIntent);
-//        mBuilder.setLatestEventInfo(context, topic, body, notificationIntent);
-        mNotificationManager.notify(NOTIFICATION_ID, mBuilder.build());
-        NOTIFICATION_ID++;
+
+
+
+//        Ringtone r = RingtoneManager.getRingtone(getApplicationContext(), notification);
+
+        if (muteoff == 1 && !stumm && alarm_immer) {
+            tonein = true;
+            tonaus = false;
+        }
+        if (muteoff == 1 && dnd <= NotificationManager.INTERRUPTION_FILTER_PRIORITY) {
+            tonein = true;
+            tonaus = true;
+        }
+        if (muteoff == 2 && kling_nachts && dnd <= NotificationManager.INTERRUPTION_FILTER_PRIORITY) {
+            tonein = true;
+            tonaus = true;
+        }
+        if (muteoff == 2 && tuer_immer) {
+            tonein = true;
+            tonaus = true;
+        }
+        if (muteoff == 3) {
+            mNotificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALL);
+            manager.setRingerMode(AudioManager.RINGER_MODE_SILENT);
+            mBluetoothAdapter.disable();
+        }
+        if (muteoff == 4) {
+            mNotificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALL);
+            manager.setRingerMode(AudioManager.RINGER_MODE_VIBRATE);
+            mBluetoothAdapter.disable();
+        }
+        if (muteoff == 5) {
+            mNotificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY);
+            manager.setRingerMode(AudioManager.RINGER_MODE_NORMAL);
+            mBluetoothAdapter.disable();
+        }
+        if (muteoff == 6) {
+            tonein = true;
+            mBluetoothAdapter.enable();
+        }
+        if (muteoff == 8) {
+            mNotificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALL);
+            manager.setRingerMode(AudioManager.RINGER_MODE_SILENT);
+            mBluetoothAdapter.enable();
+        }
+        if (muteoff == 9) {
+            mNotificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALL);
+            manager.setRingerMode(AudioManager.RINGER_MODE_VIBRATE);
+            mBluetoothAdapter.enable();
+        }
+
+        if (dnd == NotificationManager.INTERRUPTION_FILTER_PRIORITY || prio == 8) {
+            ton = false;
+        }
+        if (muteoff == 1 ) {
+            ton = true;
+        }
+
+        Uri notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.sonar);
+
+        if (muteoff == 7) {
+            tuer_vol = alarm_vol;
+            tonein = false;
+            ton = true;
+            mBluetoothAdapter.enable();
+            wecker = true;
+
+            if (notification == null) {
+                notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+            }
+        }
+        if (tonein) {
+            mNotificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALL);
+            manager.setRingerMode(AudioManager.RINGER_MODE_NORMAL);
+            manager.setStreamVolume(AudioManager.STREAM_MUSIC, tuer_vol, 0);
+            manager.setStreamVolume(AudioManager.STREAM_ALARM, alarm_vol, 0);
+            manager.setStreamVolume(AudioManager.STREAM_NOTIFICATION, tuer_vol, 0);
+            manager.setStreamVolume(AudioManager.STREAM_SYSTEM, tuer_vol, 0);
+            manager.setStreamVolume(AudioManager.STREAM_RING, tuer_vol, 0);
+        }
+
+        if (((prio > 1 && prio < 9) || (prio > 9 && prio < 20) || (prio == 9 && debug) || (prio == 99))) {
+
+            String NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_00";
+            notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.sonar);
+            switch (prio) {
+                case 3:
+                    notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.kill);
+                    NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_03";
+                    break;
+                case 4:
+                    notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.ohpickme);
+                    NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_04";
+                    break;
+                case 5:
+                    notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.dingdong);
+                    NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_05";
+                    break;
+                case 6:
+                    notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.icquhoh);
+                    NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_06";
+                    break;
+                case 7:
+                    notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.mute);
+                    NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_07";
+                    wecker = false;
+                    break;
+                case 9:
+                    NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_00";
+                    break;
+                case 10:
+                    notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.countdown);
+                    NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_10";
+                    break;
+                case 11:
+                    notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.countdownstart);
+                    NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_11";
+                    break;
+                case 12:
+                    notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.burp);
+                    NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_12";
+                    break;
+                case 13:
+                    notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.play);
+                    NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_13";
+                    break;
+                case 14:
+                    notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.cookie);
+                    NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_14";
+                    break;
+                case 15:
+                    notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.groot);
+                    NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_15";
+                    break;
+                case 16:
+                    notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.whatwasthat);
+                    NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_16";
+                    break;
+                case 17:
+                    notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.minions_yeah);
+                    NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_17";
+                    break;
+                case 18:
+                    notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.papoi);
+                    NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_18";
+                    break;
+                case 19:
+                    notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.suckers);
+                    NOTIFICATION_CHANNEL_ID = "Steuerzentrale_prio_19";
+                    break;
+                case 99:
+                    stopPlaying();
+                    break;
+            }
+
+            NotificationCompat.Builder notificationBuilder = new NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID);
+
+            if (body != null && !body.equals("")) {
+
+                notificationBuilder.setAutoCancel(true)
+                        .setDefaults(Notification.DEFAULT_ALL)
+                        .setWhen(System.currentTimeMillis())
+                        .setSmallIcon(R.mipmap.steuerzen_icon)
+//                .setTicker("Hearty365")
+//                .setPriority(Notification.PRIORITY_MAX) // this is deprecated in API 26 but you can still use for below 26. check below update for 26 API
+                        .setContentTitle(topic)
+                        .setContentText(body)
+                        .setStyle(new NotificationCompat.BigTextStyle()
+                                .bigText(body))
+                        .setAutoCancel(false)
+                        .setContentInfo("Info")
+                        .setVibrate(new long[] {2000});
+                if (payload != null && !payload.equals("") && !payload.equals("null")){
+                    //This is the intent of PendingIntent
+                    Intent intentAction = new Intent(context,ActionReceiver.class);
+
+                    //This is optional if you have more than one buttons and want to differentiate between two
+                    intentAction.putExtra("payload",payload);
+
+                    PendingIntent pIntentlogin = PendingIntent.getBroadcast(context, Math.abs(generator.nextInt()), intentAction, PendingIntent.FLAG_UPDATE_CURRENT);
+//                    PendingIntent pIntentlogin = PendingIntent.getBroadcast(context, 1, intentAction, PendingIntent.FLAG_UPDATE_CURRENT);
+                    notificationBuilder.addAction(R.mipmap.steuerzen_icon, "Sende Bestätigung", pIntentlogin);
+                }
+
+                notificationBuilder.setContentIntent(contentIntent);
+                mNotificationManager.notify(NOTIFICATION_ID, notificationBuilder.build());
+                NOTIFICATION_ID++;
+            }else {
+                mp = MediaPlayer.create (getApplicationContext(), notification);
+                mp.start();
+//                Ringtone r = RingtoneManager.getRingtone(getApplicationContext(), notification);
+//                r.play();
+            }
+
+        }
+
+        if (((prio > 1 && prio < 9) || (prio == 9 && debug) || (prio > 9 && prio < 20)) && ton){
+            if (wecker){
+                notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+                mp = MediaPlayer.create (getApplicationContext(), notification);
+                mp.start();
+                showStopWecker();
+            }else{
+//                r.play();
+//                try {
+//                    sleep(5000);
+//                } catch (InterruptedException e) {
+//                    e.printStackTrace();
+//                }
+            }
+            if (prio == 7){// && mNotificationManager.getCurrentInterruptionFilter() != NotificationManager.INTERRUPTION_FILTER_NONE){
+//                Intent openMe = new Intent(getApplicationContext(), MainActivity.class);
+//                openMe.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP); //experiment with the flags
+//                openMe.putExtra("execVoid", "startOnTop");
+//                startActivity(openMe);
+                notification = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.minions_bido);
+                mp = MediaPlayer.create (getApplicationContext(), notification);
+                mp.setLooping(true);
+                showStopAlarm();
+                final Handler handler = new Handler();
+                handler.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        mp.start();
+                    }
+                }, 10000);
+            }
+            if (prio == 9){
+//                WindowManager mWindowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
+//
+////                View mView = mInflater.inflate(R.layout.stop_wecker, null);
+//                View mView = View.inflate(getApplicationContext(), R.layout.stop_wecker, null);
+//
+//                WindowManager.LayoutParams mLayoutParams = new WindowManager.LayoutParams(
+//                        ViewGroup.LayoutParams.WRAP_CONTENT,
+//                        ViewGroup.LayoutParams.WRAP_CONTENT, 0, 0,
+//                        WindowManager.LayoutParams.TYPE_SYSTEM_OVERLAY,
+//                        WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+//                                | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+//                                | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+//                        /* | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON */,
+//                        PixelFormat.RGBA_8888);
+//
+//                mWindowManager.addView(mView, mLayoutParams);
+//                showTuerSpionOnTop();
+//                showStopWecker();
+
+            }
+        }
+        if (vibr && (mNotificationManager.getCurrentInterruptionFilter() != NotificationManager.INTERRUPTION_FILTER_PRIORITY || tonein)){
+            Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+                // Vibrate for 500 milliseconds
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                v.vibrate(VibrationEffect.createOneShot(500, VibrationEffect.DEFAULT_AMPLITUDE));
+            } else {
+                //deprecated in API 26
+                v.vibrate(500);
+            }
+        }
+        if (tonaus) {
+            mNotificationManager.setInterruptionFilter(dnd);
+            manager.setStreamVolume(AudioManager.STREAM_NOTIFICATION, cur_vol_not, 0);
+            manager.setStreamVolume(AudioManager.STREAM_MUSIC, cur_vol_mus, 0);
+            manager.setStreamVolume(AudioManager.STREAM_SYSTEM, cur_vol_sys, 0);
+            manager.setStreamVolume(AudioManager.STREAM_RING, cur_vol_rin, 0);
+            manager.setRingerMode(slent);
+        }
+
+
+    }
+
+
+    public void stopPlaying() {
+        if (mp != null) {
+            mp.stop();
+            mp.release();
+            mp = null;
+            SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+            Integer tuer_vol = prefs.getInt("cb_ring_vol",10);
+            Integer alarm_vol = prefs.getInt("cb_alarm_vol",5);
+            AudioManager manager = (AudioManager)getSystemService(Context.AUDIO_SERVICE);
+            manager.setStreamVolume(AudioManager.STREAM_MUSIC, tuer_vol, 0);
+            manager.setStreamVolume(AudioManager.STREAM_ALARM, alarm_vol, 0);
+            manager.setStreamVolume(AudioManager.STREAM_NOTIFICATION, tuer_vol, 0);
+            manager.setStreamVolume(AudioManager.STREAM_SYSTEM, tuer_vol, 0);
+            manager.setStreamVolume(AudioManager.STREAM_RING, tuer_vol, 0);
+        }
     }
 
     public void showPic(MqttMessage message){
@@ -503,10 +970,84 @@ public class MqttConnectionManagerService extends Service {
 
     public void showTuerSpion(){
 
-        Intent openMe = new Intent(getApplicationContext(), MainActivity.class);
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+        Boolean cb_tuer_fg = prefs.getBoolean("cb_tuer_fg", false);
+
+        if (cb_tuer_fg){
+            Intent openMe = new Intent(this, ScreenOnActivity.class);
+            openMe.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP); //experiment with the flags
+            openMe.putExtra("execVoid","showTuerSpion");
+            openMe.putExtra("picNr",picNr);
+            startActivity(openMe);
+        } else {
+            Intent openMe = new Intent(getApplicationContext(), MainActivity.class);
+            openMe.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP); //experiment with the flags
+            openMe.putExtra("execVoid", "showTuerSpion");
+            openMe.putExtra("picNr", picNr);
+            startActivity(openMe);
+        }
+    }
+
+    public void showTuerSpionOnTop(){
+
+        Intent openMe = new Intent(this, ScreenOnActivity.class);
         openMe.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP); //experiment with the flags
         openMe.putExtra("execVoid","showTuerSpion");
         openMe.putExtra("picNr",picNr);
+        startActivity(openMe);
+    }
+
+    public void showStopWecker(){
+        try{
+            Intent screenOnIntent = new Intent(this, ScreenOnActivity.class);
+            screenOnIntent.putExtra("execVoid","showStopWecker");
+//            screenOnIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK); //experiment with the flags
+            screenOnIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP); //experiment with the flags
+            startActivity(screenOnIntent);
+
+//            Intent openMe = new Intent(getApplicationContext(), MainActivity.class);
+//            openMe.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP); //experiment with the flags
+//            openMe.putExtra("execVoid","showStopWecker");
+//    //        openMe.putExtra("picNr",picNr);
+//            startActivity(openMe);
+        } catch (Exception e) {
+
+        }
+
+    }
+
+    public void showStopAlarm(){
+        try{
+            Intent screenOnIntent = new Intent(this, ScreenOnActivity.class);
+            screenOnIntent.putExtra("execVoid","showStopAlarm");
+//            screenOnIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK); //experiment with the flags
+            screenOnIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP); //experiment with the flags
+            startActivity(screenOnIntent);
+
+        } catch (Exception e) {
+
+        }
+
+    }
+
+    public void switchDispOn(){
+        try{
+            Intent openMe = new Intent(getApplicationContext(), MainActivity.class);
+            openMe.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP); //experiment with the flags
+            openMe.putExtra("execVoid","switchDispOn");
+            //        openMe.putExtra("picNr",picNr);
+            startActivity(openMe);
+        } catch (Exception e) {
+
+        }
+
+    }
+
+    public void setAudioNormal(){
+
+        Intent openMe = new Intent(getApplicationContext(), MainActivity.class);
+        openMe.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP); //experiment with the flags
+        openMe.putExtra("execVoid","setAudioNormal");
         startActivity(openMe);
     }
 
@@ -537,6 +1078,10 @@ public class MqttConnectionManagerService extends Service {
         } catch (NullPointerException e){
 
         }
+    }
+
+    public void send_toast(String message){
+        Toast.makeText(getBaseContext(), message, Toast.LENGTH_LONG).show();
     }
 
     private void addToHistory(String mainText){
@@ -600,4 +1145,37 @@ public class MqttConnectionManagerService extends Service {
         timerSet = true;
     }
 
+    //The BroadcastReceiver that listens for bluetooth broadcasts
+    private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+
+            if (BluetoothDevice.ACTION_FOUND.equals(action)) {
+              //Device found
+            }
+            else if (BluetoothDevice.ACTION_ACL_CONNECTED.equals(action)) {
+                if (device.toString().equals("00:0E:9F:EF:6E:D5") || device.toString().equals("00:14:09:77:A0:F2")) {
+                    wifiReceiver.btconn = 1;
+//                    makeNotification("Bluetooth verbunden", device.toString(),9);
+                }
+              //Device is now connected
+            }
+            else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
+              //Done searching
+            }
+            else if (BluetoothDevice.ACTION_ACL_DISCONNECT_REQUESTED.equals(action)) {
+              //Device is about to disconnect
+            }
+            else if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
+//                makeNotification("Bluetooth getrennt", device.toString(),9);
+                if (device.toString().equals("00:0E:9F:EF:6E:D5") || device.toString().equals("00:14:09:77:A0:F2")) {
+                    wifiReceiver.btconn = 0;
+//                    makeNotification("Bluetooth getrennt", device.toString(),9);
+                }
+              //Device has disconnected
+            }
+        }
+    };
 }

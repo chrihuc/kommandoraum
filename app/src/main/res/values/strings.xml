@@ -11,6 +11,8 @@
     <string name="preference_rec_tasks_title">Empfange Tasks</string>
     <string name="preference_rec_tasks_sum">Empfängt und führt Actionen aus</string>
     <string name="preference_homeWifi_default" />
+    <string name="appwidget_text">EXAMPLE</string>
+    <string name="add_widget">Add widget</string>
 
 
 </resources>

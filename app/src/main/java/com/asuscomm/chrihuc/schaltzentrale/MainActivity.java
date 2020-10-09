@@ -3,6 +3,7 @@ package com.asuscomm.chrihuc.schaltzentrale;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlarmManager;
+import android.app.KeyguardManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -22,6 +23,7 @@ import android.graphics.drawable.ShapeDrawable;
 import android.graphics.drawable.shapes.RectShape;
 import android.media.AudioAttributes;
 //import android.media.Ringtone;
+import android.media.AudioManager;
 import android.media.RingtoneManager;
 //import android.net.Network;
 //import android.net.NetworkRequest;
@@ -57,6 +59,8 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewManager;
+import android.view.Window;
+import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -124,6 +128,7 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String NOTIFICATION_CHANNEL_ID = "MyChannel";
     Context context;
+    Intent starterIntent;
 
     static final String TAG = "Schaltzentrale";
 //    private static final String PROPERTY_APP_VERSION = "appVersion";
@@ -148,6 +153,11 @@ public class MainActivity extends AppCompatActivity {
     public int mescounter = 0;
     public boolean ison = true;
 
+    public boolean alleSettings = false;
+    public boolean killme = false;
+    private static final int TIME_DELAY = 500;
+    private static long back_pressed;
+
 //    private ArrayList<String> items;
     private ArrayAdapter<String> itemsAdapter;
     private ListView lvItems;
@@ -160,7 +170,7 @@ public class MainActivity extends AppCompatActivity {
     private BroadcastReceiver mReceiver = null;
 //    private BroadcastReceiver wReceiver = null;
 
-    Integer listSize = 31;
+    Integer listSize = 33;
     public ArrayList<String> inpList;
     final HkzLabel[] hkzList = new HkzLabel[listSize];
 
@@ -181,7 +191,17 @@ public class MainActivity extends AppCompatActivity {
             send_mqtt("Command/Szene/EGLauter", "{\"Szene\":\"EGLauter\"}");
         }
         if ((keyCode == KeyEvent.KEYCODE_BACK)) {
-            showMain();
+            if (back_pressed + TIME_DELAY > System.currentTimeMillis()) {
+                finish();
+                startActivity(starterIntent);
+            } else {
+                if (killme){
+                    finish();
+                }
+                showMain();
+            }
+            back_pressed = System.currentTimeMillis();
+
             //unSubscribe("AES/Prio2");
             //Toast.makeText(getBaseContext(), "Unsub to Prio2", Toast.LENGTH_LONG).show();
         }
@@ -195,6 +215,37 @@ public class MainActivity extends AppCompatActivity {
 
         StrictMode.setThreadPolicy(policy);
         super.onCreate(savedInstanceState);
+
+        context = getApplicationContext();
+        final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context.getApplicationContext());
+
+        starterIntent = getIntent();
+        String execVoid = getIntent().getStringExtra("execVoid");
+
+        Boolean vordergrund = prefs.getBoolean("checkbox_vordergrund", false);
+        if (execVoid != null && execVoid.equals("vordergrund")){
+            vordergrund = true;
+            killme = true;
+        }
+
+        if (vordergrund) {
+            if (Build.VERSION.SDK_INT >= 27) {
+//                setTurnScreenOn(true);
+                setShowWhenLocked(true);
+            } else {
+                Window window = getWindow();
+                window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED);
+//                window.addFlags(WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
+            }
+        }
+
+//        IntentFilter intentFilter = new IntentFilter();
+//        intentFilter.addAction(WifiManager.SUPPLICANT_CONNECTION_CHANGE_ACTION);
+//        intentFilter.addAction(WifiManager.SUPPLICANT_STATE_CHANGED_ACTION);
+//        intentFilter.addAction(WifiManager.WIFI_STATE_CHANGED_ACTION);
+//        WifiReceiver wifiReceiver= new WifiReceiver();
+//        registerReceiver(wifiReceiver, intentFilter);
+
         startService(new Intent(this, MQTTReceiver.class));
         if (savedInstanceState == null || hkzList[0] == null) {
             if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -225,7 +276,7 @@ public class MainActivity extends AppCompatActivity {
 //            registerConnectivityNetworkMonitorForAPI21AndUp();
 //            callAsynchronousTask();
 
-            context = getApplicationContext();
+
 
             Activity act = this;
             myHandler = new Handler();
@@ -267,49 +318,45 @@ public class MainActivity extends AppCompatActivity {
 //            WifiManager wifiManager = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
 //            WifiInfo wifiInfo = wifiManager.getConnectionInfo();
 //            String ssid = wifiInfo.getSSID();
-            final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context.getApplicationContext());
-//            String homeWifi = prefs.getString("homeWifi", "");
-//            String mqttId = prefs.getString("mqttId", "");
-//            if (ssid.equals(homeWifi)){
-//                send_mqtt_serv("Inputs/Satellite/Handy/" + mqttId, "{\"Value\": \"1\"}");
-//            }else{
-//                send_mqtt_serv("Inputs/Satellite/Handy/" + mqttId, "{\"Value\": \"0\"}");
-//            }
 
-            hkzList[0] = new HkzLabel("V00WOH1RUM1TE01", 600, 450, "°C",1,0,"", false);
-            hkzList[1] = new HkzLabel("V00WOH1RUM1CO01", 600, 500, " ppm",2,0,"", false);
-            hkzList[2] = new HkzLabel("A00TER1GEN1TE01", 420, 0, "°C",3,0,"", false);
-            hkzList[3] = new HkzLabel("V00KUE1RUM1TE02", 300, 1200, "°C",4,0,"", false);
-            hkzList[4] = new HkzLabel("V00KUE1RUM1ST01", 300, 1250, "°C",5,0,"", false);
-            hkzList[5] = new HkzLabel("Status", 0, 0, "",6,0,"", false);
 
-            hkzList[6] = new HkzLabel("V01BAD1RUM1TE01",  600, 1400, "°C",101,1,"", false);
-            hkzList[7] = new HkzLabel("V01BAD1RUM1HU01",  600, 1450, "%",102,1,"", false);
-            hkzList[8] = new HkzLabel("V01SCH1RUM1TE01",  200, 1200, "°C",103,1,"", false);
-            hkzList[9] = new HkzLabel("V01KID1RUM1TE01", 700, 300, "°C",104,1,"", false);
-            hkzList[10] = new HkzLabel("V01SCH1RUM1HE01",  200, 1300, "Lux",105,1,"", true);
-            hkzList[11] = new HkzLabel("V01SCH1RUM1HU01",  200, 1250, "%",106,1,"", true);
-            hkzList[12] = new HkzLabel("V01SCH1RUM1TE03",  200, 1150, "°C",107,1,"", true);
+            hkzList[0] = new HkzLabel("V00WOH1RUM1TE01", 600, 450, "°C",1,0,"", false,true);
+            hkzList[1] = new HkzLabel("V00WOH1RUM1CO01", 600, 500, " ppm",2,0,"", false,true);
+            hkzList[2] = new HkzLabel("A00TER1GEN1TE01", 420, 0, "°C",3,0,"", false,true);
+            hkzList[3] = new HkzLabel("V00KUE1RUM1TE02", 300, 1200, "°C",4,0,"", false,true);
+            hkzList[4] = new HkzLabel("V00KUE1RUM1ST01", 300, 1250, "°C",5,0,"", false,true);
+            hkzList[5] = new HkzLabel("Status", 0, 0, "",6,0,"", false,true);
+            hkzList[31] = new HkzLabel("CountdownAct", 0, 55, "sec",7,0,"", true,true);
+            hkzList[16] = new HkzLabel("A00EIN1GEN1TE01",  600, 1480, "°C",8,0,"", false,true);
 
-            hkzList[13] = new HkzLabel("V02ZIM1RUM1TE02", 300, 1000, "°C",201,2,"", false);
+            hkzList[6] = new HkzLabel("V01BAD1RUM1TE01",  600, 1400, "°C",101,1,"", false,true);
+            hkzList[7] = new HkzLabel("V01BAD1RUM1HU01",  600, 1450, "%",102,1,"", false,true);
+            hkzList[8] = new HkzLabel("V01SCH1RUM1TE01",  200, 1200, "°C",103,1,"", false,true);
+            hkzList[9] = new HkzLabel("V01KID1RUM1TE01", 700, 300, "°C",104,1,"", false,true);
+            hkzList[10] = new HkzLabel("V01SCH1RUM1HE01",  200, 1300, "Lux",105,1,"", true,true);
+            hkzList[11] = new HkzLabel("V01SCH1RUM1HU01",  200, 1250, "%",106,1,"", true,true);
+            hkzList[12] = new HkzLabel("V01SCH1RUM1AQ01",  200, 1350, "",107,1,"", true, true);
+            hkzList[13] = new HkzLabel("V01BUE1RUM1TE01",  200, 300, "°C",108,1,"", false,true);
 
-            hkzList[14] = new HkzLabel("Vm1ZIM1RUM1TE01", 600, 400, "°C",901,-1,"", false);
-            hkzList[15] = new HkzLabel("Vm1ZIM1PFL1TE01",  300, 300, "°C",902,-1,"", false);
-            hkzList[16] = new HkzLabel("Vm1ZIM1RUM1BA01",  600, 450, " mbar",903,-1,"", true);
-            hkzList[17] = new HkzLabel("Vm1ZIM1RUM1VO01", 600, 500, "V",904,-1,"", true);
-            hkzList[18] = new HkzLabel("Vm1ZIM1RUM1CU01",  600, 550, "mA",905,-1,"", true);
-            hkzList[19] = new HkzLabel("VIRINF1SAT01",   400, 800, "",906,-1,"Büro Pi", true);
-            hkzList[20] = new HkzLabel("VIRINF1SAT02", 600, 800, "",907,-1, "Disp Pi", true);
-            hkzList[21] = new HkzLabel("VIRINF1SAT03", 400, 900, "",908,-1, "Kell Pi",true);
-            hkzList[22] = new HkzLabel("VIRINF1SAT04", 600, 900, "",909,-1, "Tür  Pi",true);
-            hkzList[23] = new HkzLabel("Vm1ZIM2RUM1TE01",  300, 1100, "°C",910,-1,"", false);
-            hkzList[24] = new HkzLabel("Vm1ZIM2RUM1HU01", 300, 1150, "%",911,-1,"", false);
-            hkzList[25] = new HkzLabel("Vm1ZIM2RUM1TE02",  300, 1300, "°C",912,-1,"", true);
-            hkzList[26] = new HkzLabel("Vm1ZIM3RUM1TE01",  800, 1100, "°C",913,-1,"", true);
-            hkzList[27] = new HkzLabel("Vm1ZIM3RUM1TE02",  800, 1150, "°C",914,-1,"", true);
-            hkzList[28] = new HkzLabel("Vm1ZIM3RUM1TE03", 800, 1250, "°C",915,-1,"", false);
-            hkzList[29] = new HkzLabel("VIRBEW1PNG01", 400, 950, "",916,-1, "ChrisH",true);
-            hkzList[30] = new HkzLabel("VIRBEW2PNG01", 600, 950, "",917,-1, "SabH",true);
+            hkzList[14] = new HkzLabel("V02ZIM1RUM1TE02", 300, 950, "°C",201,2,"", false,true);
+            hkzList[32] = new HkzLabel("V02ZIM1RUM1ST01", 300, 1000, "°C",202,2,"", false,true);
+
+            hkzList[15] = new HkzLabel("Vm1ZIM1RUM1TE01", 600, 400, "°C",901,-1,"", false,true);
+            hkzList[17] = new HkzLabel("Vm1ZIM1RUM1BA01",  600, 450, " mbar",903,-1,"", true,true);
+            hkzList[18] = new HkzLabel("Vm1GEB1POW1PO01",  600, 550, "Watt",905,-1,"", true,true);
+            hkzList[19] = new HkzLabel("V00WOH1POW2PO02",   600, 500, "Watt",906,-1,"", true,true);
+            hkzList[20] = new HkzLabel("VIRINF1SAT02", 600, 800, "",907,-1, "Disp Pi", true,false);
+            hkzList[21] = new HkzLabel("VIRINF1SAT03", 400, 900, "",908,-1, "Kell Pi",true,false);
+            hkzList[22] = new HkzLabel("VIRINF1SAT04", 600, 900, "",909,-1, "Tür  Pi",true,false);
+            hkzList[23] = new HkzLabel("Vm1ZIM2RUM1TE01",  300, 1100, "°C",910,-1,"", false,true);
+            hkzList[24] = new HkzLabel("Vm1ZIM2RUM1HU01", 300, 1150, "%",911,-1,"", false,true);
+            hkzList[25] = new HkzLabel("Vm1ZIM2RUM1TE02",  300, 1300, "°C",912,-1,"", true,true);
+            hkzList[26] = new HkzLabel("Vm1ZIM3RUM1TE01",  800, 1100, "°C",913,-1,"", true,true);
+            hkzList[27] = new HkzLabel("Vm1ZIM3RUM1TE02",  800, 1150, "°C",914,-1,"", true,true);
+            hkzList[28] = new HkzLabel("Vm1ZIM3RUM1TE03", 800, 1250, "°C",915,-1,"", false,true);
+
+            hkzList[29] = new HkzLabel("Vm1ZIM2WAS1QF06", 400, 300, "l/min",816,-2, "",true,true);
+            hkzList[30] = new HkzLabel("VIRBEW2PNG01", 600, 950, "",917,-1, "SabH",true,false);
             inpList= new ArrayList<String>();
             for (int i = 0; i < hkzList.length; i++) {
                 inpList.add(hkzList[i].Name);
@@ -382,19 +429,7 @@ public class MainActivity extends AppCompatActivity {
         //Toast.makeText(getBaseContext(), "Subscribing to Inputs " + concounter + " reconnects, " + mescounter + " messages.", Toast.LENGTH_LONG).show();
         concounter = 0;
         mescounter = 0;
-//        if (mqttAndroidClient == null){
-//            mqRunner.getMqttConnection();
-//        }
-        if (!ScreenReceiver.wasScreenOn) {
-            // this is when onResume() is called due to a screen state change
-            Log.e("MYAPP", "SCREEN TURNED ON");
-//            subscribeToTopic("Inputs/HKS/#");
-//            subscribeToTopic("Settings/#");
-        } else {
-            // this is when onResume() is called when the screen state has not changed
-//            subscribeToTopic("Inputs/HKS/#");
-//            subscribeToTopic("Settings/#");
-        }
+
         ison = true;
         startService(new Intent(this, MqttConnectionManagerService.class));
         Intent intent = new Intent("screenstatus");
@@ -417,8 +452,22 @@ public class MainActivity extends AppCompatActivity {
         getMenuInflater().inflate(R.menu.main, menu);
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
         Boolean devel = prefs.getBoolean("checkbox_pref_devel", true);
+        Boolean besuch = prefs.getBoolean("cb_besucher_app", false);
+        if (!besuch) {
+            menu.add(Menu.NONE, 103, 101, "Wecker");
+            menu.add(Menu.NONE, 104, 101, "Schaltuhr");
+            menu.add(Menu.NONE, 105, 101, "Nachrichten");
+            menu.add(Menu.NONE, 106, 101, "App Settings");
+            menu.add(Menu.NONE, 98, 101, "Reset Erinnerungen");
+        }
         if (devel) {
             menu.add(Menu.NONE, 99, 101, "Haus Szenen");
+            menu.add(Menu.NONE, 100, 101, "BDQs");
+            menu.add(Menu.NONE, 102, 101, "Alle Settings");
+            menu.add(Menu.NONE, 107, 101, "Garten");
+        }
+        if (besuch & devel) {
+            menu.add(Menu.NONE, 106, 101, "App Settings");
         }
         return true;
     }
@@ -440,26 +489,31 @@ public class MainActivity extends AppCompatActivity {
 //            showMain();
 //            return true;
 //        }
-//        if (id == R.id.ug) {
-//            showUG();
-//            return true;
-//        }
-        if (id == R.id.settings) {
+        if (id == 107) {
+            showGarten();
+            return true;
+        }
+        if (id == 106) {
             startActivity(new Intent(this, EinstellungenActivity.class));
             return true;
         }
-        if (id == R.id.wecker) {
+        if (id == 103) {
             subscribeToTopic("DataRequest/Answer/Cron");
             send_mqtt("DataRequest/Request","{\"request\": \"Wecker\"}");
             return true;
         }
-        if (id == R.id.schaltuhr) {
+        if (id == 104) {
             subscribeToTopic("DataRequest/Answer/Cron");
             send_mqtt("DataRequest/Request","{\"request\": \"Schaltuhr\"}");
             return true;
         }
-        if (id == R.id.notifications) {
+        if (id == 105) {
             showNachrichten();
+            return true;
+        }
+        if (id == 100) {
+            send_mqtt("DataRequest/Request","{\"request\": \"BDQs\"}");
+            showBDQs();
             return true;
         }
         if (id == 99) {
@@ -467,7 +521,20 @@ public class MainActivity extends AppCompatActivity {
             send_mqtt("DataRequest/Request","{\"request\": \"SzenenGruppen\"}");
             return true;
         }
+        if (id == 98) {
+            subscribeToTopic("DataRequest/Answer/SzenenErinnerung");
+            send_mqtt("DataRequest/Request","{\"request\": \"SzenenErinnerung\"}");
+            send_mqtt("DataRequest/Request","{\"request\": \"InputsErinnerungen\"}");
+            return true;
+        }
         if (id == R.id.szsettings) {
+            alleSettings = false;
+            subscribeToTopic("DataRequest/Answer/Settings");
+            send_mqtt("DataRequest/Request","{\"request\": \"GetSettings\"}");
+            return true;
+        }
+        if (id == 102) {
+            alleSettings = true;
             subscribeToTopic("DataRequest/Answer/Settings");
             send_mqtt("DataRequest/Request","{\"request\": \"GetSettings\"}");
             return true;
@@ -480,6 +547,91 @@ public class MainActivity extends AppCompatActivity {
         super.onNewIntent(intent);
         if(intent.getStringExtra("execVoid") != null && intent.getStringExtra("execVoid").equals("showTuerSpion")){
             showTuerSpion();
+        }
+        if(intent.getStringExtra("execVoid") != null && intent.getStringExtra("execVoid").equals("setAudioNormal")){
+            setAudioNormal();
+        }
+        if(intent.getStringExtra("execVoid") != null && intent.getStringExtra("execVoid").equals("showStopWecker")){
+            showStopWecker();
+        }
+        if(intent.getStringExtra("execVoid") != null && intent.getStringExtra("execVoid").equals("switchDispOn")){
+            switchDispOn();
+        }
+        if(intent.getStringExtra("execVoid") != null && intent.getStringExtra("execVoid").equals("startOnTop")){
+            finish();
+            starterIntent.putExtra("execVoid","vordergrund");
+            startActivity(starterIntent);
+        }
+    }
+
+    @Override
+    public void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        //Screen On
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
+    }
+
+    public void switchDispOn(){
+        try {
+            if (Build.VERSION.SDK_INT >= 27) {
+                setTurnScreenOn(true);
+                setShowWhenLocked(true);
+            } else {
+                Window window = getWindow();
+                window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED);
+                window.addFlags(WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
+            }
+        }catch (Exception e) {
+
+        }
+        onAttachedToWindow();
+    }
+
+    public void showStopWecker(){
+        level = -2;
+        try {
+            Intent openMe = new Intent(getApplicationContext(), MainActivity.class);
+            openMe.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP); //experiment with the flags
+            startActivity(openMe);
+            setContentView(R.layout.stop_wecker);
+            Button bu = findViewById(R.id.button3);
+            bu.setText("Stop Wecker");
+            bu.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    Intent serviceIntent = new Intent(MainActivity.this, MqttConnectionManagerService.class);
+                    serviceIntent.putExtra("execVoid", "stopWecker");
+                    startService(serviceIntent);
+
+                    final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context.getApplicationContext());
+                    Boolean vordergrund = prefs.getBoolean("checkbox_vordergrund", false);
+                    if (!vordergrund) {
+                        if (Build.VERSION.SDK_INT >= 27) {
+                            //            setTurnScreenOn(true);
+                            setShowWhenLocked(false);
+                        } else {
+                            Window window = getWindow();
+                            window.clearFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED);
+                            //            window.addFlags(WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
+                        }
+                    }
+                    showMain();
+
+                }
+            });
+//            KeyguardManager km = (KeyguardManager) context.getSystemService(Context.KEYGUARD_SERVICE);
+//            final KeyguardManager.KeyguardLock kl = km.newKeyguardLock("MyKeyguardLock");
+//            kl.disableKeyguard();
+//
+//            PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+//            PowerManager.WakeLock wakeLock = pm.newWakeLock(PowerManager.FULL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP
+//                    | PowerManager.ON_AFTER_RELEASE, "steuerzentrale:MyWakeLock");
+//            wakeLock.acquire();
+//            Intent screenOnIntent = new Intent(this, ScreenOnActivity.class);
+//            screenOnIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK); //experiment with the flags
+//            screenOnIntent.putExtra("execVoid","showStopWecker");
+//            startActivity(screenOnIntent);
+        }catch (Exception e) {
+
         }
     }
 
@@ -496,6 +648,9 @@ public class MainActivity extends AppCompatActivity {
                 break;
             case 2:
                 showDG();
+                break;
+            case -2:
+                showGarten();
                 break;
         }
     }
@@ -514,13 +669,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void showSZsettings(MqttMessage message) {
+
         unSubscribe("DataRequest/Answer/Settings");
         setContentView(R.layout.wecker);
         level = 10;
         String szsettings = message.toString();
         try {
             SettingsView sV = new SettingsView(this);
-            sV.settings_show(szsettings);
+            sV.settings_show(szsettings, alleSettings);
         } catch (JSONException e) {
             e.printStackTrace();
         }
@@ -533,12 +689,14 @@ public class MainActivity extends AppCompatActivity {
 
         level = 0;
 
+
         final RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayout);
 
-        final DigiObj[] doList = new DigiObj[3];
-        doList[0] = new DigiObj("V00WOH1TUE1DI01",600, 0, false);
-        doList[1] = new DigiObj("V00KUE1TUE1DI01",0, 750, false);
+        final DigiObj[] doList = new DigiObj[4];
+        doList[0] = new DigiObj("V00WOH1TUE1DI01",600, 0, true);
+        doList[1] = new DigiObj("V00KUE1TUE1DI01",0, 750, true);
         doList[2] = new DigiObj("V00FLU1TUE1DI01",650, 1450, true);
+        doList[3] = new DigiObj("V00FLU1TUE1DI02",700, 1450, true);
         setDigiObj(doList, mrl);
 
         final ButtonFeatures[] SettList = new ButtonFeatures[1];
@@ -546,20 +704,28 @@ public class MainActivity extends AppCompatActivity {
         setSettLabels(SettList, mrl);
 
 
-        final SzenenButton[] SzList = new SzenenButton[2];
+        final SzenenButton[] SzList = new SzenenButton[1];
         SzList[0] = new SzenenButton("A/V", Arrays.asList("TV", "SonosEG", "Radio", "AVaus", "Kino", "KinoAus", "LesenEG"), 50, 300);
-        SzList[1] = new SzenenButton("Status", Arrays.asList("Wach", "Leise", "SchlafenGehen", "SchlafenGehenLeise", "Schlafen", "Gehen", "Gegangen"), 50, 450);
         setSzenenButton(SzList, mrl);
+        final SzenenButton[] SzList1 = new SzenenButton[1];
+        SzList1[0] = new SzenenButton("Status", Arrays.asList("Wach", "Leise", "SchlafenGehen", "SchlafenGehenLeise", "Schlafen", "Gehen", "Abwesend", "Besuch"), 50, 450);
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+        Boolean besuch = prefs.getBoolean("cb_besucher_app", false);
+        if (!besuch) {
+            setSzenenButton(SzList1, mrl);
+        }
 
-        final DeviceButton[] DvList = new DeviceButton[1];
-        DvList[0] = new DeviceButton("Temp", "V00WOH1RUM1ST01", Arrays.asList("17", "Aus", "20.0", "20.5", "21.0", "21.5", "22.0", "22.5", "23.0"), 300, 300);
-        setDeviceButton(DvList, mrl);
+//        final DeviceButton[] DvList = new DeviceButton[1];
+//        DvList[0] = new DeviceButton("Temp", "V00WOH1RUM1ST01", Arrays.asList("17", "Aus", "20.0", "20.5", "21.0", "21.5", "22.0", "22.5", "23.0"), 300, 300);
+//        setDeviceButton(DvList, mrl);
 
-        final ButtonFeatures[] Blist = new ButtonFeatures[4];
-        Blist[0] = new ButtonFeatures("V00KUE1DEK1LI01", "Off", "Aus", 100, 1400, "",901);
-        Blist[1] = new ButtonFeatures("V00KUE1DEK1LI02", "Off", "Aus", 100, 1000,"",902);
-        Blist[2] = new ButtonFeatures("V00ESS1DEK1LI01", "Off", "Aus", 170, 750, "",903);
-        Blist[3] = new ButtonFeatures("V00FLU1DEK1LI01", "Off", "Aus", 600, 1100, "", 904);
+        final ButtonFeatures[] Blist = new ButtonFeatures[6];
+        Blist[0] = new ButtonFeatures("V00KUE1DEK1LI01", "Toggle", "0 - 1", 100, 1400, "",901);
+        Blist[1] = new ButtonFeatures("V00KUE1DEK1LI02", "Toggle", "0 - 1", 100, 1000,"",902);
+        Blist[2] = new ButtonFeatures("V00ESS1DEK1LI01", "Toggle", "0 - 1", 170, 750, "",903);
+        Blist[3] = new ButtonFeatures("V00FLU1DEK1LI01", "Toggle", "0 - 1", 600, 1100, "", 904);
+        Blist[4] = new ButtonFeatures("V00WOH1DEK1LI01", "Toggle", "0 - 1", 300, 400, "", 905);
+        Blist[5] = new ButtonFeatures("V00WOH1RUM1DO10", "Toggle", "0 - 1", 700, 300, "", 906);
 
         Button bu = new Button(this);
         RelativeLayout.LayoutParams rl = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
@@ -580,6 +746,68 @@ public class MainActivity extends AppCompatActivity {
         });
         //RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayout);
         mrl.addView(bu);
+
+        // stummschaltung
+        Button qt = new Button(this);
+        RelativeLayout.LayoutParams rlqt = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
+        rlqt.addRule(RelativeLayout.ALIGN_BOTTOM);
+        rlqt.leftMargin = (int) (250/1080.0 * width);
+        rlqt.topMargin = (int) (1400/1920.0 * height);
+        //qt.setId(2);
+        qt.setLayoutParams(rlqt);
+        qt.setBackgroundColor(Color.TRANSPARENT);
+
+        Boolean stumm = prefs.getBoolean("cb_stumm", true);
+        mNotificationManager = (NotificationManager)
+                this.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (stumm){
+            qt.setCompoundDrawablesWithIntrinsicBounds(R.drawable.mute, 0, 0, 0);
+//            mNotificationManager.setInterruptionFilter(3);
+        }else{
+            qt.setCompoundDrawablesWithIntrinsicBounds(R.drawable.loud, 0, 0, 0);
+        }
+        qt.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+                Boolean stumm = prefs.getBoolean("cb_stumm", true);
+                SharedPreferences.Editor editor = prefs.edit();
+                editor.putBoolean("cb_stumm", !stumm);
+                editor.commit();
+//                if (!stumm) {
+//                    mNotificationManager.setInterruptionFilter(3);
+//                }else{
+//                    mNotificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALL);
+//                }
+                showMain();
+            }
+        });
+        //RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayout);
+        if (!besuch) {
+            mrl.addView(qt);
+        }
+
+        Button st = new Button(this);
+        RelativeLayout.LayoutParams rlst = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
+        rlst.addRule(RelativeLayout.ALIGN_BOTTOM);
+        rlst.leftMargin = (int) (400/1080.0 * width);
+        rlst.topMargin = (int) (1400/1920.0 * height);
+        //st.setId(2);
+        st.setLayoutParams(rlst);
+        st.setBackgroundColor(Color.TRANSPARENT);
+        st.setCompoundDrawablesWithIntrinsicBounds(R.drawable.icon, 0, 0, 0);
+//        bu.setText("Lichter");
+        st.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                alleSettings = false;
+                subscribeToTopic("DataRequest/Answer/Settings");
+                send_mqtt("DataRequest/Request","{\"request\": \"GetSettings\"}");
+            }
+        });
+        //RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayout);
+        if (!besuch) {
+            mrl.addView(st);
+        }
+
         updateView("");
 
 
@@ -627,13 +855,15 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onSwipeLeft() {
                 super.onSwipeLeft();
-                // your swipe left here.
+                level=-2;
+                showViews(level);
             }
 
             @Override
             public void onSwipeRight() {
                 super.onSwipeRight();
-                // your swipe right here.
+                level=-2;
+                showViews(level);
             }
         });
 
@@ -645,7 +875,7 @@ public class MainActivity extends AppCompatActivity {
         switch(level) {
             case 0:
                 mrl = findViewById(R.id.relLayout);
-                if (hks.equals("") | hks.contains("Alarmanlage") | hks.contains("Status")) {
+                if (hks.equals("") || hks.contains("Alarmanlage") || hks.contains("Status")) {
                     updateMain("Alarmanlage");
                 }
                 break;
@@ -658,6 +888,9 @@ public class MainActivity extends AppCompatActivity {
             case 2:
                 mrl  = findViewById(R.id.relLayoutDG);
                 break;
+            case -2:
+                mrl  = findViewById(R.id.relLayoutOS);
+                break;
         }
 
         boolean found = false;
@@ -668,7 +901,7 @@ public class MainActivity extends AppCompatActivity {
         if (hks.equals("")){
             for (int i = 0; i < hkzList.length; i++) {
                     if (hkzList[i] != null && hkzList[i].level != null && hkzList[i].level == level){
-                        if (! hkzList[i].devel || devel) {
+                        if (hkzList[i].enabled  && (! hkzList[i].devel || devel)) {
                             updList[j] = hkzList[i];
                             found = true;
                             j++;
@@ -679,7 +912,7 @@ public class MainActivity extends AppCompatActivity {
             for (int i = 0; i < hkzList.length; i++) {
                 if (hkzList[i] != null && hkzList[i].Name != null && hkzList[i].Name.equals(hks)) {
                     if (hkzList[i].level == level){
-                        if (! hkzList[i].devel || devel) {
+                        if (hkzList[i].enabled  && (! hkzList[i].devel || devel)) {
                             updList[0] = hkzList[i];
                             found = true;
                             break;
@@ -697,8 +930,20 @@ public class MainActivity extends AppCompatActivity {
 //                }
 //            });
         }
-        if ((hks.contains("Alarmanlage") | hks.contains("Status") | hks.contains("TUE1DI01")) && level == 0){
+        if ((hks.contains("Alarmanlage") || hks.contains("Status") || hks.contains("TUE1DI0")) && level == 0){
             updateMain(hks);
+        }
+        if ((hks.contains("TUE1DI0")) && level == -1){
+            showUG();
+        }
+        if ((hks.contains("FEN")) && level == 2){
+            showDG();
+        }
+        if ((hks.contains("FEN")) && level == 1){
+            showOG();
+        }
+        if ((hks.contains("DO")) && level == -2){
+            showGarten();
         }
 
     }
@@ -709,10 +954,11 @@ public class MainActivity extends AppCompatActivity {
         RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayout);
         boolean found;
 
-        final DigiObj[] doList = new DigiObj[3];
-        doList[0] = new DigiObj("V00WOH1TUE1DI01",600, 0, false);
-        doList[1] = new DigiObj("V00KUE1TUE1DI01",0, 750, false);
+        final DigiObj[] doList = new DigiObj[4];
+        doList[0] = new DigiObj("V00WOH1TUE1DI01",600, 0, true);
+        doList[1] = new DigiObj("V00KUE1TUE1DI01",0, 750, true);
         doList[2] = new DigiObj("V00FLU1TUE1DI01",650, 1450, true);
+        doList[3] = new DigiObj("V00FLU1TUE1DI02",700, 1450, true);
 
         final DigiObj[] updListdo = new DigiObj[1];
         found = false;
@@ -725,12 +971,16 @@ public class MainActivity extends AppCompatActivity {
         if (found) {
             setDigiObj(updListdo, mrl);
         }
-        if (hks.contains("Alarmanlage") | hks.contains("Status")) {
+        if (hks.contains("Alarmanlage") || hks.contains("Status")) {
             ValueList sensor = sensoren.get("Alarmanlage");
             ValueList status = sensoren.get("Status");
             if (sensor != null) {
                 String valueread = sensor.getValue();
                 if (valueread.equals("True")) {
+                    View but = (View) findViewById(2);
+                    if (but != null) {
+                        ((ViewManager) but.getParent()).removeView(but);
+                    }
                     Button bu2 = new Button(this);
                     RelativeLayout.LayoutParams rl = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
                     rl.addRule(RelativeLayout.ALIGN_BOTTOM);
@@ -739,14 +989,14 @@ public class MainActivity extends AppCompatActivity {
                     bu2.setId(2);
                     bu2.setLayoutParams(rl);
                     bu2.setBackgroundColor(Color.TRANSPARENT);
-                    if (status != null && status.getValue().equals("Ausnahmezustand")) {
+                    if (status != null && status.getValue().equals("Alarm")) {
                         bu2.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ausnahmez, 0, 0, 0);
                         //        bu.setText("Lichter");
                         bu2.setOnClickListener(new View.OnClickListener() {
                             public void onClick(View v) {
                                 View but = (View) findViewById(2);
                                 ((ViewManager) but.getParent()).removeView(v);
-                                send_mqtt("Command/Szene/Wach", "{\"Szene\":\"Wach\"}");
+                                send_mqtt("Command/Szene/AlarmAus", "{\"Szene\":\"AlarmAus\"}");
                             }
                         });
                         //RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayout);
@@ -758,7 +1008,8 @@ public class MainActivity extends AppCompatActivity {
                             public void onClick(View v) {
                                 View but = (View) findViewById(2);
                                 ((ViewManager) but.getParent()).removeView(v);
-                                send_mqtt("DataRequest/SetSettings/", "{\"Name\":\"Alarmanlage\",\"Value\":\"False\"}");
+                                // send_mqtt("DataRequest/SetSettings/", "{\"Name\":\"Alarmanlage\",\"Value\":\"False\"}");
+                                send_mqtt("Command/Szene/AlarmanlageAus", "{\"Szene\":\"AlarmanlageAus\"}");
                             }
                         });
                         //RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayout);
@@ -838,7 +1089,7 @@ public class MainActivity extends AppCompatActivity {
             rlt.addRule(RelativeLayout.ALIGN_BOTTOM);
             rlt.leftMargin = (int) (DropDListC.x_value/1080.0 * width);
             rlt.topMargin = (int) (DropDListC.y_value/1920.0 * height);
-            rlt.width = (int) (240.0/1080 * width);
+            rlt.width = (int) (300.0/1080 * width);
             but.setLayoutParams(rlt);
             but.setText(DropDListC.Name);
             but.setOnClickListener(new View.OnClickListener() {
@@ -964,8 +1215,13 @@ public class MainActivity extends AppCompatActivity {
                             showWecker_DataRec(message);
                         } else if (topic.toLowerCase().contains("Answer/SzenenGruppen".toLowerCase())) {
                             showSzenen(message);
+                        } else if (topic.toLowerCase().contains("Answer/SzenenErinnerung".toLowerCase())) {
+                            showSzenen(message);
                         } else if (topic.toLowerCase().contains("Answer/Settings".toLowerCase())) {
                             showSZsettings(message);
+                        } else if (topic.toLowerCase().contains("Answer/BDQs".toLowerCase())) {
+                            zerlegeBDQs(message);
+                            itemsAdapter.notifyDataSetChanged();
                         } else if (ison && (topic != null)) {
 //                            String[] bits = topic.split("/");
 //                            String lastOne = bits[bits.length - 1];
@@ -1025,7 +1281,7 @@ public class MainActivity extends AppCompatActivity {
         addToHistory("Decoding: " + message.toString());
         try{
             JSONObject jMqtt = new JSONObject(telegram);
-            String jValue = jMqtt.optString("Value").toString();
+            String jValue = jMqtt.optString("Value");
 //            String jDesc = jMqtt.optString("Description").toString();
             String jKey = "leer";
             if (jMqtt.has("HKS")) {
@@ -1090,6 +1346,46 @@ public class MainActivity extends AppCompatActivity {
 
         }
         unSubscribe("Message/Alarmliste");
+    }
+
+    public void zerlegeBDQs(MqttMessage message){
+        String telegram = message.toString();
+        messages.clear();
+        try{
+            JSONObject jMqtt = new JSONObject(telegram);
+            JSONArray arr = jMqtt.getJSONArray("payload");
+            final int lengthJsonArr = arr.length();
+            for (int i = 0; i < lengthJsonArr; i++) {
+                messages.add(new String(arr.getString(i)));
+            }
+
+//            List<alarmlist> alarme = new ArrayList<alarmlist>();
+//            while(keys.hasNext()) {
+//                String key = keys.next();
+//                if (jMqtt.get(key) instanceof JSONObject) {
+//                    JSONObject jKey = jMqtt.getJSONObject(key);
+//                    String ts = jKey.optString("ts").toString();
+//                    String Text = ts + ": " + jKey.optString("Text").toString();
+//                    try {
+//                        Date date = dateFormat.parse(ts);
+//                        alarmlist newalarm = new alarmlist(date, Text, jKey.optString("uuid").toString());
+//                        alarme.add(newalarm);
+//                    } catch (ParseException e) {
+//                    }
+//                }
+//            }
+//            Collections.sort(alarme);
+//
+//            for(alarmlist alarm : alarme){
+//                uuids.put(alarm.toString(),alarm.getuuid());
+//                messages.add(new String(alarm.toString()));
+//            }
+
+            itemsAdapter.notifyDataSetChanged();
+        } catch (JSONException e) {
+
+        }
+        unSubscribe("DataRequest/Answer/BDQs");
     }
 
     public void showPic(MqttMessage message){
@@ -1236,6 +1532,9 @@ public class MainActivity extends AppCompatActivity {
                         if (bfList[i].Name.toLowerCase().contains("VIR".toLowerCase())) {
                             tv.setText(bfList[i].text);
                             tvBack.setText(bfList[i].text);
+                        }else if (bfList[i].unit.contains("sec")){
+                            tv.setText(valueread + bfList[i].unit);
+                            tvBack.setText(valueread + bfList[i].unit);
                         } else {
                             tv.setText(valueread + bfList[i].unit);
                             tvBack.setText(valueread + bfList[i].unit);
@@ -1341,6 +1640,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    @SuppressLint("ResourceType")
     public void showOG() {
         //String sets = req_from_server("Settings");
         //String inpts = req_from_server("Inputs_hks");
@@ -1350,11 +1650,48 @@ public class MainActivity extends AppCompatActivity {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
         Boolean devel = prefs.getBoolean("checkbox_pref_devel", true);
 
-        RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayoutOG);
+        final RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayoutOG);
 
-        final ButtonFeatures[] Blist = new ButtonFeatures[1];
-        Blist[0] = new ButtonFeatures("V01FLU1DEK1LI01", "Off", "Aus", 700, 750, "",14);
-        setDeviceCommandBut(Blist,mrl);
+//        final ButtonFeatures[] Blist = new ButtonFeatures[2];
+//        Blist[0] = new ButtonFeatures("V01FLU1DEK1LI01", "Off", "Aus", 700, 750, "",14);
+//        Blist[1] = new ButtonFeatures("V01SCH1DEK1LI01", "off", "Aus", 200, 1000, "",15);
+//        setDeviceCommandBut(Blist,mrl);
+
+        final DigiObj[] doList = new DigiObj[5];
+        doList[0] = new DigiObj("V01BAD1FEN1DI01",700, 1500, true);
+        doList[1] = new DigiObj("V01SCH1FEN1DI01",190, 1500, true);
+        doList[2] = new DigiObj("V01SCH1FEN2DI01",20, 900, true);
+        doList[3] = new DigiObj("V01BUE1FEN1DI01",20, 600, true);
+        doList[4] = new DigiObj("V01BUE1FEN2DI01",190, 50, true);
+        setDigiObj(doList, mrl);
+
+        final ButtonFeatures[] Blist = new ButtonFeatures[6];
+        Blist[0] = new ButtonFeatures("V01FLU1DEK1LI01", "Toggle", "0 - 1", 700, 750, "",914);
+        Blist[1] = new ButtonFeatures("V01SCH1DEK1LI01", "Toggle", "0 - 1", 200, 1000, "",915);
+        Blist[2] = new ButtonFeatures("V01BAD1DEK1LI01", "Toggle", "0 - 1", 700, 1100, "",916);
+        Blist[3] = new ButtonFeatures("V01BAD1DEK1LI02", "Toggle", "0 - 1", 700, 1200, "", 917);
+        Blist[4] = new ButtonFeatures("V01KID1DEK1LI01", "Toggle", "0 - 1", 700, 150, "", 918);
+        Blist[5] = new ButtonFeatures("V01BUE1DEK1LI01", "Toggle", "0 - 1", 200, 200, "", 919);
+
+        Button bu = new Button(this);
+        RelativeLayout.LayoutParams rl = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
+        rl.addRule(RelativeLayout.ALIGN_BOTTOM);
+        rl.leftMargin = (int) (720/1080.0 * width);
+        rl.topMargin = (int) (1400/1920.0 * height);
+        bu.setId(1);
+        bu.setLayoutParams(rl);
+        bu.setBackgroundColor(Color.TRANSPARENT);
+        bu.setCompoundDrawablesWithIntrinsicBounds(R.drawable.lampe_aus, 0, 0, 0);
+        bu.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                View but = (View) findViewById(1);
+                ((ViewManager)but.getParent()).removeView(v);
+                setDeviceCommandBut(Blist,mrl);
+            }
+        });
+        //RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayout);
+        mrl.addView(bu);
+
         updateView("");
         mrl.setOnTouchListener(new OnSwipeTouchListener(MainActivity.this) {
             @Override
@@ -1386,6 +1723,20 @@ public class MainActivity extends AppCompatActivity {
         level = 2;
         updateView("");
         RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayoutDG);
+
+        final ButtonFeatures[] Blist = new ButtonFeatures[4];
+        Blist[0] = new ButtonFeatures("V00ZIM0RUM0DO01", "on", "Ein", 700, 400, "",14);
+        Blist[1] = new ButtonFeatures("V02BAD1DEK1LI01", "Toggle", "0 - 1", 650, 1050, "",15);
+        Blist[2] = new ButtonFeatures("V02ZIM1DEK1LI01", "Toggle", "0 - 1", 350, 700, "",16);
+        Blist[3] = new ButtonFeatures("V02TRE1DEK1LI01", "Toggle", "0 - 1", 700, 700, "",17);
+        setDeviceCommandBut(Blist,mrl);
+
+        final DigiObj[] doList = new DigiObj[3];
+        doList[0] = new DigiObj("V02BAD1FEN1DI01",500, 1150, true);
+        doList[1] = new DigiObj("V02ZIM1FEN1DI01",0, 600, true);
+        doList[2] = new DigiObj("V02ZIM1FEN2DI01",0, 850, true);
+        setDigiObj(doList, mrl);
+
         mrl.setOnTouchListener(new OnSwipeTouchListener(MainActivity.this) {
             @Override
             public void onSwipeUp() {
@@ -1415,21 +1766,48 @@ public class MainActivity extends AppCompatActivity {
         level = -1;
         RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayoutUG);
 
-        final DropDList[] DropDEl = new DropDList[3];
-        DropDEl[0] = new DropDList(1,1,1,"Firewall öffnen", "FWOpen");
-        DropDEl[1] = new DropDList(1,2,2,"Firewall schliessen", "FWClose");
-        DropDEl[2] = new DropDList(1,3,3,"System neustarten", "SysReboot");
-        final DropDListContainer DropDCont = new DropDListContainer("System",DropDEl,300,300);
-        setDropDButton(DropDCont, mrl);
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+        Boolean besuch = prefs.getBoolean("cb_besucher_app", true);
 
-        final ButtonFeatures[] Blist = new ButtonFeatures[2];
-        Blist[0] = new ButtonFeatures("Vm1FLU1DEK1LI01", "Off", "Aus", 700, 750, "",31);
-        Blist[1] = new ButtonFeatures("Vm1ZIM1DEK1LI01", "Off", "Aus", 300, 400,"",32);
+        final DropDList[] DropDEl = new DropDList[2];
+        DropDEl[0] = new DropDList(1,1,1,"Server reboot", "RebootProliant");
+        DropDEl[1] = new DropDList(1,2,2,"Steuerzentrale neustarten", "SysReboot");
+        final DropDListContainer DropDCont = new DropDListContainer("System",DropDEl,300,300);
+        if (!besuch) {
+            setDropDButton(DropDCont, mrl);
+        }
+
+        final DropDList[] DropFWl = new DropDList[6];
+        DropFWl[0] = new DropDList(1,1,1,"Firewall Schliessen", "FWClose");
+        DropFWl[1] = new DropDList(1,2,2,"Dormi öffnen", "OpenFWDormi");
+        DropFWl[2] = new DropDList(1,3,3,"Shellies öffnen", "OpenFWShellies");
+        DropFWl[3] = new DropDList(1,4,4,"TVs öffnen", "OpenFWTVs");
+        DropFWl[4] = new DropDList(1,5,5,"Küchengeräte öffnen", "OpenHAFWs");
+        DropFWl[5] = new DropDList(1,6,6,"Gateways öffnen", "OpenGateWFWs");
+        final DropDListContainer DropFWCont = new DropDListContainer("Firewall",DropFWl,600,200);
+        if (!besuch) {
+            setDropDButton(DropFWCont, mrl);
+        }
+
+        final ButtonFeatures[] Blist = new ButtonFeatures[5];
+        Blist[0] = new ButtonFeatures("Vm1FLU1DEK1LI01", "Toggle", "0 - 1", 700, 750, "",31);
+        Blist[1] = new ButtonFeatures("Vm1ZIM1DEK1LI01", "Toggle", "0 - 1", 300, 400,"",32);
+        Blist[2] = new ButtonFeatures("Vm1ZIM2DEK1LI01", "Toggle", "0 - 1", 150, 900,"",33);
+        Blist[3] = new ButtonFeatures("Vm1ZIM3DEK1LI01", "Toggle", "0 - 1", 600, 1250,"",34);
+        Blist[4] = new ButtonFeatures("Vm1ZIM2WAS1DO01", "Ein", "Ein", 100, 1250,"",34);
         setDeviceCommandBut(Blist,mrl);
 
-        final DigiObj[] doList = new DigiObj[1];
-        doList[0] = new DigiObj("Vm1RUM1TUE1DI01",650, 0, true);
+        final DigiObj[] doList = new DigiObj[2];
+        doList[0] = new DigiObj("Vm1ZIM1TUE1DI02",950, 150, false);
+        doList[1] = new DigiObj("Vm1ZIM1TUE1DI03",950, 200, false);
         setDigiObj(doList, mrl);
+
+        Button bu  = (Button) findViewById(R.id.button2);
+        bu.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                setAudioNormal();
+            }
+        });
 
         updateView("");
         mrl.setOnTouchListener(new OnSwipeTouchListener(MainActivity.this) {
@@ -1455,10 +1833,86 @@ public class MainActivity extends AppCompatActivity {
         });
 
     }
+    public void showGarten() {
+        setContentView(R.layout.garten);
+        level = -2;
+        RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayoutOS);
+        final ButtonFeatures[] Blist = new ButtonFeatures[3];
+        Blist[0] = new ButtonFeatures("A00GAR1WAS1DO01", "Toggle", "0 - 1", 600, 400, "",801);
+        Blist[1] = new ButtonFeatures("A00GAR1WAS2DO01", "Toggle", "0 - 1", 400, 400, "",802);
+        Blist[2] = new ButtonFeatures("A00GAR1WAS3DO01", "Toggle", "0 - 1", 200, 400, "",803);
+//        Blist[3] = new ButtonFeatures("Vm1ZIM3DEK1LI01", "Toggle", "0 - 1", 600, 1250,"",34);
+//        Blist[4] = new ButtonFeatures("Vm1ZIM2WAS1DO01", "Ein", "Ein", 100, 1250,"",34);
+        setDeviceCommandBut(Blist,mrl);
+
+        final DigiObj[] doList = new DigiObj[3];
+        doList[0] = new DigiObj("A00GAR1WAS1DO01",600, 380, true);
+        doList[1] = new DigiObj("A00GAR1WAS2DO01",400, 380, true);
+        doList[2] = new DigiObj("A00GAR1WAS3DO01",200, 380, true);
+        setDigiObj(doList, mrl);
+
+        updateView("");
+
+        mrl.setOnTouchListener(new OnSwipeTouchListener(MainActivity.this) {
+
+            @Override
+            public void onClick() {
+                super.onClick();
+                // your on click here
+            }
+
+            @Override
+            public void onDoubleClick() {
+                super.onDoubleClick();
+                // your on onDoubleClick here
+            }
+
+            @Override
+            public void onLongClick() {
+                super.onLongClick();
+                // your on onLongClick here
+            }
+
+            @Override
+            public void onSwipeUp() {
+                super.onSwipeUp();
+            }
+
+            @Override
+            public void onSwipeDown() {
+                super.onSwipeDown();
+            }
+
+            @Override
+            public void onSwipeLeft() {
+                super.onSwipeLeft();
+                level=0;
+                showViews(level);
+            }
+
+            @Override
+            public void onSwipeRight() {
+                super.onSwipeRight();
+                level=0;
+                showViews(level);
+            }
+        });
+
+    }
+
+    public void setAudioNormal(){
+        AudioManager manager = (AudioManager)getSystemService(Context.AUDIO_SERVICE);
+//        manager.setRingerMode(AudioManager.RINGER_MODE_NORMAL);
+        manager.setStreamVolume(AudioManager.STREAM_MUSIC, 10, 0);
+        manager.setStreamVolume(AudioManager.STREAM_NOTIFICATION, 10, 0);
+        manager.setStreamVolume(AudioManager.STREAM_SYSTEM, 10, 0);
+        manager.setStreamVolume(AudioManager.STREAM_RING, 10, 0);
+    }
 
     public void showSzenen(MqttMessage message){
 
         unSubscribe("DataRequest/Answer/SzenenGruppen");
+        unSubscribe("DataRequest/Answer/SzenenErinnerung");
         setContentView(R.layout.szenen);
         level = 10;
 
@@ -1490,7 +1944,11 @@ public class MainActivity extends AppCompatActivity {
                     } else{
                         hilfsliste2 = szenen.get(Gruppe);
                         hilfsliste.add(Name);
-                        hilfsliste2.put(Name,Desc);
+                        if (Desc != null) {
+                            hilfsliste2.put(Name, Desc);
+                        }else{
+                            hilfsliste2.put(Name, Name);
+                        }
                         szenen.put(Gruppe, hilfsliste2);
                     }
             }
@@ -1546,7 +2004,9 @@ public class MainActivity extends AppCompatActivity {
 
         });
         int spinnerPosition = adapter.getPosition("Favorit");
-        dropdown.setSelection(spinnerPosition);
+        if (spinnerPosition != 0) {
+            dropdown.setSelection(spinnerPosition);
+        }
 
     }
 
@@ -1572,6 +2032,21 @@ public class MainActivity extends AppCompatActivity {
         //RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayout);
 
         setupListViewListener();
+    }
+    public void showBDQs() {
+        level = 10;
+        subscribeToTopic("DataRequest/Answer/BDQs");
+        setContentView(R.layout.notifications);
+
+        lvItems = (ListView) findViewById(R.id.lvItems);
+        //items = new ArrayList<String>();
+        itemsAdapter = new ArrayAdapter<String>(this,
+                android.R.layout.simple_list_item_1, messages);
+        lvItems.setAdapter(itemsAdapter);
+        //items.add("First Item");
+        //items.add("Second Item");
+        //RelativeLayout mrl  = (RelativeLayout) findViewById(R.id.relLayout);
+
     }
 
     private void setupListViewListener() {
@@ -1646,39 +2121,39 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    private void makeNotification(String topic, String body){
-        mNotificationManager = (NotificationManager)
-                this.getSystemService(Context.NOTIFICATION_SERVICE);
-        PendingIntent contentIntent = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class), PendingIntent.FLAG_CANCEL_CURRENT);
-        NotificationCompat.Builder mBuilder =
-                new NotificationCompat.Builder(this)
-                        .setSmallIcon(R.mipmap.steuerzen_icon)
-                        .setContentTitle(topic)
-                        .setStyle(new NotificationCompat.BigTextStyle()
-                                .bigText(body))
-                        .setContentText(body);
-        NotificationChannel notificationChannel = new NotificationChannel(NOTIFICATION_CHANNEL_ID, "My Notifications", NotificationManager.IMPORTANCE_HIGH);
-        // Configure the notification channel.
-        AudioAttributes att = new AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                .build();
-        Uri alarmSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
-        notificationChannel.setSound(alarmSound,att);
-        notificationChannel.setDescription(body);
-        notificationChannel.enableLights(true);
-        notificationChannel.setLightColor(Color.RED);
-        notificationChannel.setVibrationPattern(new long[]{0, 1000, 500, 1000});
-        notificationChannel.enableVibration(true);
-        mNotificationManager.createNotificationChannel(notificationChannel);
-//        if (imageThumbnail != null) {
-//            mBuilder.setStyle(new Notification.BigPictureStyle()
-//                    .bigPicture(imageThumbnail).setSummaryText(messageBody));
-//        }
-        mBuilder.setContentIntent(contentIntent);
-        mNotificationManager.notify(NOTIFICATION_ID, mBuilder.build());
-        NOTIFICATION_ID++;
-    }
+//    private void makeNotification(String topic, String body){
+//        mNotificationManager = (NotificationManager)
+//                this.getSystemService(Context.NOTIFICATION_SERVICE);
+//        PendingIntent contentIntent = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class), PendingIntent.FLAG_CANCEL_CURRENT);
+//        NotificationCompat.Builder mBuilder =
+//                new NotificationCompat.Builder(this)
+//                        .setSmallIcon(R.mipmap.steuerzen_icon)
+//                        .setContentTitle(topic)
+//                        .setStyle(new NotificationCompat.BigTextStyle()
+//                                .bigText(body))
+//                        .setContentText(body);
+//        NotificationChannel notificationChannel = new NotificationChannel(NOTIFICATION_CHANNEL_ID, "My Notifications", NotificationManager.IMPORTANCE_HIGH);
+//        // Configure the notification channel.
+//        AudioAttributes att = new AudioAttributes.Builder()
+//                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+//                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+//                .build();
+//        Uri alarmSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+//        notificationChannel.setSound(alarmSound,att);
+//        notificationChannel.setDescription(body);
+//        notificationChannel.enableLights(true);
+//        notificationChannel.setLightColor(Color.RED);
+//        notificationChannel.setVibrationPattern(new long[]{0, 1000, 500, 1000});
+//        notificationChannel.enableVibration(true);
+//        mNotificationManager.createNotificationChannel(notificationChannel);
+////        if (imageThumbnail != null) {
+////            mBuilder.setStyle(new Notification.BigPictureStyle()
+////                    .bigPicture(imageThumbnail).setSummaryText(messageBody));
+////        }
+//        mBuilder.setContentIntent(contentIntent);
+//        mNotificationManager.notify(NOTIFICATION_ID, mBuilder.build());
+//        NOTIFICATION_ID++;
+//    }
 
     private void makeImageNotific(String topic, String body, MqttMessage message){
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
@@ -1735,6 +2210,8 @@ public class MainActivity extends AppCompatActivity {
         } catch (MqttException e) {
             System.err.println("Error Publishing: " + e.getMessage());
             e.printStackTrace();
+        } catch (NullPointerException e){
+
         }
     }
 
@@ -1761,7 +2238,6 @@ public class MainActivity extends AppCompatActivity {
         } catch (IOException e) {
             e.printStackTrace();
         }}
-
 
 
 //    public String req_from_server(String Befehl){

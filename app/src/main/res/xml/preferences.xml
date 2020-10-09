@@ -38,10 +38,65 @@
         android:inputType="textMultiLine" />
 
     <CheckBoxPreference
+        android:key="cb_powersave"
+        android:title="Strom sparen"
+        android:summary="MQTT aus wenn nicht gebraucht"
+        android:defaultValue="true" />
+
+    <CheckBoxPreference
+        android:key="cb_auto_tor"
+        android:title="Garagentor auto auf"
+        android:summary="Garagentor automatisch öffnen"
+        android:defaultValue="true" />
+
+    <CheckBoxPreference
         android:key="cb_ring_nachts"
         android:title="Türklingel Nachts"
         android:summary="Türklingel nachts nicht stumm"
         android:defaultValue="true" />
+
+    <CheckBoxPreference
+        android:key="cb_ring_immer"
+        android:title="Türklingel immer laut"
+        android:summary="Türklingel immer laut"
+        android:defaultValue="true" />
+
+    <SeekBarPreference
+        android:key="cb_ring_vol"
+        android:title="Türklingel Lautstärke"
+        android:max="15"
+        android:defaultValue="10" />
+
+    <CheckBoxPreference
+        android:key="cb_tuer_fg"
+        android:title="Klingelbilder über Lockscreen"
+        android:summary="Klingelbilder über Lockscreen"
+        android:defaultValue="false" />
+
+
+    <SeekBarPreference
+        android:key="cb_alarm_vol"
+        android:title="Wecker Lautstärke"
+        android:max="15"
+        android:defaultValue="5" />
+
+    <CheckBoxPreference
+        android:key="cb_alarm_imer"
+        android:title="Immer alarmieren"
+        android:summary="Nicht stören ausschalten für Alarme"
+        android:defaultValue="true" />
+
+    <CheckBoxPreference
+        android:key="cb_stumm"
+        android:title="Alle stumm"
+        android:summary="Handy stumm, app stumm"
+        android:defaultValue="false" />
+
+    <CheckBoxPreference
+        android:key="cb_vibrate"
+        android:title="Extra vibrieren"
+        android:summary="Extra vibrieren wenn anders nicht geht"
+        android:defaultValue="false" />
 
     <CheckBoxPreference
         android:key="checkbox_pref_mes"
@@ -77,6 +132,18 @@
         android:key="checkbox_mess_devel"
         android:title="Zeige Entwickler Nachrichten"
         android:summary="Debug"
+        android:defaultValue="false" />
+
+    <CheckBoxPreference
+        android:key="checkbox_vordergrund"
+        android:title="App über Lockscreen"
+        android:summary="Debug"
+        android:defaultValue="false" />
+
+    <CheckBoxPreference
+        android:key="cb_besucher_app"
+        android:title="Besucher Handy"
+        android:summary="Besucher"
         android:defaultValue="false" />
 
 </PreferenceScreen>

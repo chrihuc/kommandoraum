@@ -1,0 +1,42 @@
+{
+  "project_info": {
+    "project_number": "568669847245",
+    "firebase_url": "https://schaltzentrale-95a1e.firebaseio.com",
+    "project_id": "schaltzentrale-95a1e",
+    "storage_bucket": "schaltzentrale-95a1e.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:568669847245:android:cd0eda9f62e45a1f",
+        "android_client_info": {
+          "package_name": "com.asuscomm.chrihuc.schaltzentrale"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "568669847245-sir87ln316cmre4shbjg3fe9qliatfsu.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB9vhBAxY-mgfgDczW1CbqXhyaYzNSuLp8"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 1,
+          "other_platform_oauth_client": []
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
